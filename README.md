@@ -1,116 +1,142 @@
-# Donkey Kong 64: Recompiled
-Donkey Kong 64: Recompiled is a project that uses [N64: Recompiled](https://github.com/Mr-Wiseguy/N64Recomp) to **statically recompile** Donkey Kong 64 into a native port with many new features and enhancements. This project uses [RT64](https://github.com/rt64/rt64) as the rendering engine to provide some of these enhancements.
+# Donkey Kong 64: UnKONGtrolled
 
-### [Check out the latest release here](https://github.com/Rainchus/Donkey-Kong-64-Recompiled/releases).
+A PC port of Donkey Kong 64, forked from [Donkey Kong 64 Rekongpiled](https://github.com/Rainchus/Donkey-Kong-64-Recompiled), maintained with maximum AI involvement out of pure, unadulterated spite. 🦍
 
-### **This repository and its releases do not contain game assets. The original game is required to build or run this project.**
+This project uses [N64: Recompiled](https://github.com/Mr-Wiseguy/N64Recomp) to **statically recompile** Donkey Kong 64 into a native PC port with many new features and enhancements, and [RT64](https://github.com/rt64/rt64) as its rendering engine.
 
-<div align="left" valign="middle">
-<a href="https://runblaze.dev">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://www.runblaze.dev/logo_dark.png">
-   <img align="right" src="https://www.runblaze.dev/logo_light.png" height="102px"/>
- </picture>
-</a>
+> **This repository and its releases do not contain game assets. The original game is required to build or run this project.**
 
-<br style="display: none;"/>
+---
 
-_Thank you [Blaze](https://runblaze.dev) for supporting this project by providing Linux ARM64 and Apple Silicon macOS Github Action Runners!_
+## Why Does This Fork Exist?
 
-</div>
+The upstream project made the decision to combine several control settings into a single setting, with no way to separate or configure them individually. A contributor submitted a pull request with a proper fix. The upstream maintainers closed it with an accusation of AI-generated code — an accusation that was false — and did not engage with the substance of the fix.
+
+Spite is a very powerful motivator.
+
+This fork exists to apply that fix, and to continue development with the explicit and enthusiastic use of AI tooling. The name *UnKONGtrolled* was chosen by **Kagi Assistant** on September 20, 2026 — making it the first AI contributor to this repository. The full lore is documented in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
 
 ## Table of Contents
 * [System Requirements](#system-requirements)
 * [Features](#features)
-  * [Plug and Play](#plug-and-play)
   * [Fully Intact N64 Effects](#fully-intact-n64-effects)
   * [Easy-to-Use Menus](#easy-to-use-menus)
   * [High Framerate Support](#high-framerate-support)
+  * [Widescreen and Ultrawide Support](#widescreen-and-ultrawide-support)
+  * [Additional Control Options](#additional-control-options)
   * [Low Input Lag](#low-input-lag)
   * [Instant Load Times](#instant-load-times)
   * [Linux and Steam Deck Support](#linux-and-steam-deck-support)
-* [Planned Features](#planned-features)
 * [FAQ](#faq)
 * [Known Issues](#known-issues)
 * [Building](#building)
+* [Contributing](#contributing)
 * [Libraries Used and Projects Referenced](#libraries-used-and-projects-referenced)
 
+---
+
 ## System Requirements
-A GPU supporting Direct3D 12.0 (Shader Model 6) or Vulkan 1.2 is required to run this project. The oldest GPUs that should be supported for each vendor are:
-* GeForce GT 630
-* Radeon HD 7750 (the one from 2012, not to be confused with the RX 7000 series) and newer
+
+A GPU supporting Direct3D 12.0 (Shader Model 6) or Vulkan 1.2 is required. The oldest GPUs that should be supported for each vendor are:
+
+* NVIDIA GeForce GT 630
+* AMD Radeon HD 7750 (2012, not the RX 7000 series) and newer
 * Intel HD 510 (Skylake)
 
 A CPU supporting the AVX instruction set is also required (Intel Core 2000 series or AMD Bulldozer and newer).
 
-If you have issues with crashes on startup, make sure your graphics drivers are fully up to date. 
+If you experience crashes on startup, make sure your graphics drivers are fully up to date.
+
+---
 
 ## Features
 
 #### Fully Intact N64 Effects
-A lot of care was put into RT64 to make sure all graphical effects were rendered exactly as they did originally on the N64. No workarounds or "hacks" were made to replicate these effects, with the only modifications to them being made for enhancement purposes such as widescreen support.
+All graphical effects are rendered exactly as they appeared on the N64. No workarounds or hacks were used to replicate them — modifications are made only for enhancement purposes such as widescreen support.
 
 #### Easy-to-Use Menus
-Gameplay settings, graphics settings, input mappings, and audio settings can all be configured with the in-game config menu. The menus can all be used with mouse, controller, or keyboard for maximum convenience.
+Gameplay, graphics, input, and audio settings can all be configured through the in-game config menu, fully usable with mouse, controller, or keyboard.
 
 #### High Framerate Support
-Play at any framerate you want thanks to functionality provided by RT64! Game objects and terrain, texture scrolling, screen effects, and most HUD elements are all rendered at high framerates. By default, this project is configured to run at your monitor's refresh rate. You can also play at the original framerate of the game if you prefer. **Changing framerate has no effect on gameplay.**
+Play at any framerate you want. Game objects, terrain, texture scrolling, screen effects, and most HUD elements all render at high framerates. By default the project runs at your monitor's refresh rate, but you can lock it to the original N64 framerate if you prefer. **Changing framerate has no effect on gameplay.**
 
-**Note**: External framerate limiters (such as the NVIDIA Control Panel) are known to potentially cause problems, so if you notice any stuttering then turn them off and use the manual framerate slider in the in-game graphics menu instead.
+> **Note:** External framerate limiters (e.g. NVIDIA Control Panel) can cause stuttering. Use the in-game framerate slider instead.
 
 #### Widescreen and Ultrawide Support
-Any aspect ratio is supported, with most effects modded to work correctly in widescreen. The HUD can also be positioned at 16:9 when using ultrawide aspect ratios if preferred.
+Any aspect ratio is supported, with most effects adjusted to work correctly in widescreen. The HUD can be positioned at 16:9 when using ultrawide aspect ratios.
 
-**Note**: Some animation quirks can be seen at the edges of the screen in certain cutscenes when using very wide aspect ratios.
+> **Note:** Some animation quirks may appear at screen edges in certain cutscenes at very wide aspect ratios.
 
 #### Additional Control Options
-Customize your experience by setting your stick deadzone to your liking, as well as adjusting the X and Y axis inversion for aiming.
+Set your stick deadzone to your liking, and independently adjust X and Y axis inversion for aiming — *as separate, individual settings, the way God intended.*
 
 #### Low Input Lag
-This project has been optimized to have as little input lag as possible, making the game feel more responsive than ever!
+Optimized to minimize input lag, making the game feel more responsive than the original hardware.
 
 #### Instant Load Times
-Saving and loading files, going from place to place, and pausing all happen in the blink of an eye thanks to the game running natively on modern hardware.
+Saving, loading, transitioning between areas, and pausing are all effectively instantaneous on modern hardware.
 
 #### Linux and Steam Deck Support
-A Linux binary is available for playing on most up-to-date distros, including on the Steam Deck.
+A Linux binary is available for most up-to-date distros, including Steam Deck.
 
-To play on Steam Deck, extract the Linux build onto your deck. Then, in desktop mode, right click the DK64Recompiled executable file and select "Add to Steam". From there, you can return to Gaming mode and configure the controls as needed. See the [Steam Deck gyro aim FAQ section](#how-do-i-set-up-gyro-aiming-on-steam-deck) for more detailed instructions.
+To play on Steam Deck: extract the Linux build, then in Desktop Mode right-click the `DK64Recompiled` executable and select "Add to Steam." Return to Gaming Mode and configure controls as needed.
+
+---
 
 ## FAQ
 
 #### What is static recompilation?
-Static recompilation is the process of automatically [translating an application from one platform to another](https://www.youtube.com/watch?v=lMGu6Ng_3yA&t=55s). For more details, check out the full description of how this project's recompilation works here: [N64: Recompiled](https://github.com/Mr-Wiseguy/N64Recomp).
+Static recompilation is the process of automatically [translating an application from one platform to another](https://www.youtube.com/watch?v=lMGu6Ng_3yA&t=55s). For full details on how this project's recompilation works, see [N64: Recompiled](https://github.com/Mr-Wiseguy/N64Recomp).
 
-#### How is this related to the in-progress decompilation project?
-Unlike N64 ports in the past, this project is not based on the source code provided by a decompilation of the game. This is because static recompilation bypasses the need for decompiled source code when making a port, allowing ports to be made **without source code**. However, the reverse engineering work done by the decompilation team was invaluable for providing some of the enhancements featured in this project. For this reason, the project uses headers and some functions from the decompilation project in order to make modifications to the game. Many thanks to the decompilation team for all of the hard work they've done.
+#### How is this related to the decompilation project?
+This project is not based on decompiled source code. Static recompilation bypasses the need for decompiled source when making a port. However, the reverse engineering work done by the decompilation team was invaluable for certain enhancements — the project uses headers and some function definitions from the decompilation project for this purpose.
 
-#### Where is the savefile stored?
-- Windows: `%LOCALAPPDATA%\DK64Recompiled\saves`
-- Linux: `~/.config/DK64Recompiled/saves`
+#### Where is the save file stored?
+- **Windows:** `%LOCALAPPDATA%\DK64Recompiled\saves`
+- **Linux:** `~/.config/DK64Recompiled/saves`
 
 #### How do I choose a different ROM?
-**You don't.** This project is **only** a port of Donkey Kong 64 and it will only accept one specific ROM: the US version of the N64 release of Donkey Kong 64. ROMs in formats other than .z64 will be automatically converted, as long as it is the correct ROM. **It is not an emulator and it cannot run any arbitrary ROM.** 
+**You don't.** This project is a port of one specific game from one specific release: the US N64 version of Donkey Kong 64. It is not an emulator. ROMs in formats other than `.z64` will be automatically converted as long as they are the correct ROM.
 
-If you want to play a modded ROM or in another language, note that support for modding and other languages will be added to the project itself in the future and will not rely on you supplying a different ROM. 
+---
 
 ## Known Issues
-* Intel GPUs on Linux may not currently work. If you have experience with Vulkan development on Linux, help here would be greatly appreciated!
-* The prebuilt Linux binary may not work correctly on some distributions of Linux. If you encounter such an issue, building the project locally yourself is recommended. A Flatpak or AppImage may be provided in the future to solve this issue. Adding the Linux version to Steam and setting "Steam Linux Runtime" as the compatibility tool or launching it via Gamescope may work around the issue. Alternatively, running the Windows version with Proton is known to work well and may also work around this issue.
-* Overlays such as MSI Afterburner and other software such as Wallpaper Engine can cause performance issues with this project that prevent the game from rendering correctly. Disabling such software is recommended.
+
+* Intel GPUs on Linux may not currently work. If you have Vulkan development experience on Linux, contributions are welcome.
+* The prebuilt Linux binary may not work on all distributions. If you encounter this, try building locally, adding the Windows version via Proton, or launching via Gamescope or Steam Linux Runtime as a compatibility layer.
+* Overlays such as MSI Afterburner, and software such as Wallpaper Engine, can cause rendering issues. Disabling them is recommended.
+
+---
 
 ## Building
-Building is not required to play this project, as prebuilt binaries (which do not contain game assets) can be found in the [Releases](https://github.com/Rainchus/Donkey-Kong-64-Recompiled/releases) section. Instructions on how to build this project can be found in the [BUILDING.md](BUILDING.md) file.
+
+Prebuilt binaries (which do not contain game assets) are available in the [Releases](https://github.com/christopher-conley/Donkey-Kong-64-UnKONGtrolled/releases) section. If you'd prefer to build from source, see [BUILDING.md](BUILDING.md).
+
+---
+
+## Contributing
+
+All contributions are welcome. AI-assisted code is explicitly permitted and encouraged — see [CONTRIBUTING.md](CONTRIBUTING.md) for the full philosophy, guidelines, and lore.
+
+---
 
 ## Libraries Used and Projects Referenced
-* [RT64](https://github.com/rt64/rt64) for the project's rendering engine
-* [RmlUi](https://github.com/mikke89/RmlUi) for building the menus and launcher
-* [lunasvg](https://github.com/sammycage/lunasvg) for SVG rendering, used by RmlUi
-* [FreeType](https://freetype.org/) for font rendering, used by RmlUi  
-* [moodycamel::ConcurrentQueue](https://github.com/cameron314/concurrentqueue) for semaphores and fast, lock-free MPMC queues
-* [Gamepad Motion Helpers](https://github.com/JibbSmart/GamepadMotionHelpers) for sensor fusion and calibration algorithms to implement gyro aiming
-* [Donkey Kong 64 Decompilation](https://gitlab.com/dk64_decomp/dk64) for headers and some function definitions, used for making patches or some enhancements
-* [Ares emulator](https://github.com/ares-emulator/ares) for RSP vector instruction reference implementations, used in RSP recompilation
 
-Special thanks to [thecozies](https://github.com/thecozies) for designing and helping implement the launcher and config menus!<br/>
-Also special thanks to [fewffwa](https://github.com/fewffwa) for testing multiple in development builds and bug reporting.
+* [RT64](https://github.com/rt64/rt64) — rendering engine
+* [RmlUi](https://github.com/mikke89/RmlUi) — menus and launcher
+* [lunasvg](https://github.com/sammycage/lunasvg) — SVG rendering (used by RmlUi)
+* [FreeType](https://freetype.org/) — font rendering (used by RmlUi)
+* [moodycamel::ConcurrentQueue](https://github.com/cameron314/concurrentqueue) — lock-free MPMC queues and semaphores
+* [Gamepad Motion Helpers](https://github.com/JibbSmart/GamepadMotionHelpers) — sensor fusion and gyro aiming calibration
+* [Donkey Kong 64 Decompilation](https://gitlab.com/dk64_decomp/dk64) — headers and function definitions used for patches and enhancements
+* [Ares emulator](https://github.com/ares-emulator/ares) — RSP vector instruction reference implementations
+
+Special thanks to [thecozies](https://github.com/thecozies) for designing and helping implement the launcher and config menus.
+Special thanks to [fewffwa](https://github.com/fewffwa) for testing and bug reporting.
+
+---
+
+*Forked from [Donkey Kong 64 Rekongpiled](https://github.com/Rainchus/Donkey-Kong-64-Recompiled). Built with spite. Maintained with AI. 🦍*
+
