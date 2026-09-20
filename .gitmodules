@@ -15,3 +15,6 @@
 [submodule "lib/vcpkg"]
 	path = lib/vcpkg
 	url = https://github.com/microsoft/vcpkg
+[submodule "lib/N64Recomp"]
+	path = lib/N64Recomp
+	url = https://github.com/christopher-conley/N64Recomp.git
