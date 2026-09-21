@@ -117,6 +117,11 @@ jobs:
           cmake --build build-linux --target DK64Recompiled -j"$(nproc)"
           # Printed so a cache that has silently stopped working is visible
           # rather than showing up only as a build that got slow again.
+          # Printed to the log as well as the summary: the summary is not
+          # reachable from the API, so stats that only go there cannot be read
+          # back when working out why a build was slow.
+          echo "--- ccache (linux) ---"
+          ccache --show-stats -v || ccache --show-stats
           { echo '### ccache (linux)'; echo '```'; ccache --show-stats; echo '```'; } \
             >> "$GITHUB_STEP_SUMMARY"
 
@@ -219,6 +224,11 @@ jobs:
           mkdir -p "$CCACHE_DIR"
           ccache --zero-stats >/dev/null
           WINEDEBUG=-all ./cross/build-windows.sh
+          # Printed to the log as well as the summary: the summary is not
+          # reachable from the API, so stats that only go there cannot be read
+          # back when working out why a build was slow.
+          echo "--- ccache (windows) ---"
+          ccache --show-stats -v || ccache --show-stats
           { echo '### ccache (windows)'; echo '```'; ccache --show-stats; echo '```'; } \
             >> "$GITHUB_STEP_SUMMARY"
 
