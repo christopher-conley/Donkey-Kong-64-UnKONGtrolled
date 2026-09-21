@@ -1,4 +1,4 @@
-# Builds DK64Recompiled for Linux x64 and Windows x64 
+# Builds DK64UnKONGtrolled for Linux x64 and Windows x64 
 #
 # Why self-hosted: the build process requires resources (see BUILDING.md) that cannot be
 # stored at GitHub in any form. The necessary assets live outside the
@@ -124,7 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf dist && mkdir -p dist
-          cp build-linux/DK64Recompiled dist/
+          cp build-linux/DK64UnKONGtrolled dist/
           cp -r assets dist/
           cp recompcontrollerdb.txt dist/
 
@@ -138,13 +138,13 @@ jobs:
       # upload-artifact zips without file modes, so a bare binary would arrive
       # without +x and the published Linux build would not run. Tar first.
       - name: Archive
-        run: tar -czf DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64.tar.gz -C dist .
+        run: tar -czf DK64UnKONGtrolled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64.tar.gz -C dist .
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64
-          path: DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64.tar.gz
+          name: DK64UnKONGtrolled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64
+          path: DK64UnKONGtrolled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64.tar.gz
           if-no-files-found: error
 
   # ------------------------------------------------------------ windows cross
@@ -229,14 +229,14 @@ jobs:
           [ -z "$found" ] || { echo "::error::asset file or symlink staged for upload:"; echo "$found"; exit 1; }
           echo "dist is clean ($(du -sh build-win/dist | cut -f1))"
 
-      - name: Archive
-        run: tar -czf DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-windows-x64.tar.gz -C build-win/dist .
-
+      # No tar here. upload-artifact already zips what it is given, and the
+      # execute bit that makes the Linux binary need a tarball is meaningless
+      # on Windows -- taring first only produced a zip wrapping a tarball.
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-windows-x64
-          path: DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-windows-x64.tar.gz
+          name: DK64UnKONGtrolled-${{ steps.short_sha.outputs.SHORT_SHA }}-windows-x64
+          path: build-win/dist/
           if-no-files-found: error
 
   # ------------------------------------------------------------------ release
@@ -275,8 +275,18 @@ jobs:
       - name: Collect
         run: |
           set -euo pipefail
+          command -v zip >/dev/null || { echo "::error::zip is not installed"; exit 1; }
+          # The two targets arrive in different shapes: Linux as a tarball that
+          # preserves its execute bit, Windows as loose files. Package the
+          # Windows one here so the release carries a zip rather than a
+          # directory nobody can download as a unit.
           find artifacts -name '*.tar.gz' -exec mv {} . \;
-          sha256sum ./*.tar.gz > SHA256SUMS
+          out="$PWD"
+          for d in artifacts/*/; do
+            [ -n "$(ls -A "$d" 2>/dev/null)" ] || continue
+            ( cd "$d" && zip -qr "$out/$(basename "$d").zip" . )
+          done
+          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
           cat SHA256SUMS
 
       - name: Release
@@ -285,4 +295,5 @@ jobs:
           body_path: notes.md
           files: |
             *.tar.gz
+            *.zip
             SHA256SUMS

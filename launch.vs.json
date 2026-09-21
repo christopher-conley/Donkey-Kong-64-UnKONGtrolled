@@ -5,8 +5,8 @@
     {
       "type": "default",
       "project": "CMakeLists.txt",
-      "projectTarget": "DK64Recompiled.exe",
-      "name": "DK64Recompiled.exe",
+      "projectTarget": "DK64UnKONGtrolled.exe",
+      "name": "DK64UnKONGtrolled.exe",
       "currentDir": "${workspaceRoot}",
       "args": ["--show-console"]
     }

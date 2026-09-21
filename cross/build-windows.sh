@@ -1,7 +1,7 @@
 #!/bin/bash
 # SPDX-FileCopyrightText: 2026 Christopher Conley
 # SPDX-License-Identifier: MIT
-# Cross-compile DK64Recompiled.exe for Windows (x64, MSVC ABI) from Linux.
+# Cross-compile DK64UnKONGtrolled.exe for Windows (x64, MSVC ABI) from Linux.
 #
 # Uses clang-cl + lld-link against an xwin-provided Windows SDK, which is the same
 # compiler the project's own Windows CI job uses -- so every vendored header takes its
@@ -72,7 +72,7 @@ WINEDEBUG="${WINEDEBUG:--all}" cmake --build "$BUILD" --target DK64Recompiled -j
 echo "==> staging runtime files"
 DIST="$BUILD/dist"
 rm -rf "$DIST"; mkdir -p "$DIST"
-cp "$BUILD/DK64Recompiled.exe" "$DIST/"
+cp "$BUILD/DK64UnKONGtrolled.exe" "$DIST/"
 cp "$BUILD/SDL2.dll" "$BUILD/dxcompiler.dll" "$BUILD/dxil.dll" "$DIST/"
 # Everything in the triplet's bin/ is a runtime dependency of libcurl. Globbed rather
 # than named because vcpkg's zlib port has shipped the DLL as both libzlib1.dll and
@@ -83,6 +83,6 @@ cp -r "$REPO/assets" "$DIST/"
 [ -f "$REPO/recompcontrollerdb.txt" ] && cp "$REPO/recompcontrollerdb.txt" "$DIST/"
 
 echo
-echo "built: $DIST/DK64Recompiled.exe"
+echo "built: $DIST/DK64UnKONGtrolled.exe"
 echo "NOTE: needs the Microsoft Visual C++ 2015-2022 Redistributable on the target"
 echo "      machine (VCRUNTIME140.dll / MSVCP140.dll), same as the official builds."

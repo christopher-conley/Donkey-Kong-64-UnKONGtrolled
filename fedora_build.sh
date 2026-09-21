@@ -22,6 +22,6 @@ cmake -S . -B build-cmake \
 
 cmake --build build-cmake --target DK64Recompiled -j$(nproc) --config "${BUILD_TYPE}"
 
-cp build-cmake/DK64Recompiled DK64Recompiled && \
-chmod +x ./DK64Recompiled && \
-./DK64Recompiled
+cp build-cmake/DK64UnKONGtrolled DK64UnKONGtrolled && \
+chmod +x ./DK64UnKONGtrolled && \
+./DK64UnKONGtrolled

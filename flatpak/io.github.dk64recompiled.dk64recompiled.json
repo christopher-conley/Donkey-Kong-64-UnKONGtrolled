@@ -31,7 +31,7 @@
         "cmake --build cmake-build --config Release --target DK64Recompiled --parallel",
         "rm -rf assets/scss",
         "mkdir -p /app/bin",
-        "cp cmake-build/DK64Recompiled /app/bin/DK64Recompiled",
+        "cp cmake-build/DK64UnKONGtrolled /app/bin/DK64UnKONGtrolled",
         "cp recompcontrollerdb.txt /app/bin/recompcontrollerdb.txt",
         "cp -R assets /app/bin/assets",
         "install -Dm644 icons/app.png /app/share/icons/hicolor/512x512/apps/${FLATPAK_ID}.png",

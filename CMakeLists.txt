@@ -388,4 +388,11 @@ target_sources(DK64Recompiled PRIVATE ${GENERATED_NRM_SOURCES})
 
 target_sources(DK64Recompiled PRIVATE ${SOURCES})
 
+# The CMake target keeps its original name so that the ~25 target_* calls above
+# are untouched; only the emitted file is renamed. dk64::program_id is
+# deliberately NOT changed with it -- that string names the configuration and
+# save directory, and moving it would orphan every existing user's settings
+# and saves rather than migrate them.
+set_target_properties(DK64Recompiled PROPERTIES OUTPUT_NAME DK64UnKONGtrolled)
+
 set_property(TARGET DK64Recompiled PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
