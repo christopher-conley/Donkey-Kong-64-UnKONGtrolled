@@ -98,11 +98,39 @@ foreach(_d "${CMAKE_CURRENT_LIST_DIR}/cross/case-shim-lib" "${CMAKE_CURRENT_LIST
     endif()
 endforeach()
 
+# xwin has shipped the x86-64 library directories under both "x64" and
+# "x86_64" depending on its version, so probe rather than assume. A wrong
+# guess here does not fail until the first link, with every import library
+# reported missing at once.
+function(_xwin_libdir out base)
+    foreach(_a x64 x86_64)
+        if (IS_DIRECTORY "${base}/${_a}")
+            set(${out} "${base}/${_a}" PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+    message(FATAL_ERROR "No x64 or x86_64 library directory under ${base}")
+endfunction()
+
+_xwin_libdir(_CRT_LIB  "${XWIN_SPLAT}/crt/lib")
+_xwin_libdir(_UM_LIB   "${XWIN_SPLAT}/sdk/lib/um")
+_xwin_libdir(_UCRT_LIB "${XWIN_SPLAT}/sdk/lib/ucrt")
+
+# lld-link is case-sensitive here while MSVC was not: the SDK ships
+# kernel32.Lib and CMake's implicit link set asks for kernel32.lib. xwin
+# normally creates lowercase symlinks beside each library; if it was run with
+# --disable-symlinks, every implicit library goes missing at the first link.
+if (NOT EXISTS "${_UM_LIB}/kernel32.lib")
+    message(FATAL_ERROR
+        "${_UM_LIB} has no lowercase kernel32.lib. Re-run 'xwin splat' with "
+        "symlinks enabled; lld-link cannot resolve the SDK's original casing.")
+endif()
+
 set(_XWIN_LINKFLAGS
     ${_EXTRA_LIBPATHS}
-    "/libpath:${XWIN_SPLAT}/crt/lib/x64"
-    "/libpath:${XWIN_SPLAT}/sdk/lib/um/x64"
-    "/libpath:${XWIN_SPLAT}/sdk/lib/ucrt/x64")
+    "/libpath:${_CRT_LIB}"
+    "/libpath:${_UM_LIB}"
+    "/libpath:${_UCRT_LIB}")
 string(JOIN " " _XWIN_LDFLAGS ${_XWIN_LINKFLAGS})
 
 set(CMAKE_EXE_LINKER_FLAGS_INIT    "${_XWIN_LDFLAGS}")

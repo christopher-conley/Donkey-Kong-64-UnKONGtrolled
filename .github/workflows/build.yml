@@ -151,8 +151,19 @@ jobs:
           for t in clang-cl lld-link llvm-lib llvm-rc llvm-mt wine gendef cmake ninja; do
             command -v "$t" >/dev/null || fail "missing: $t"
           done
-          [ -d "${XWIN_SPLAT:-$HOME/.cache/xwin/splat}/crt/include" ] \
-            || fail "no xwin splat (xwin --accept-license splat)"
+          splat="${XWIN_SPLAT:-$HOME/.cache/xwin/splat}"
+          [ -d "$splat/crt/include" ] || fail "no xwin splat at $splat"
+          # The headers existing does not mean the libraries do. xwin has used
+          # both x64 and x86_64 for the arch directory, and lld-link needs the
+          # lowercase symlinks beside the SDK's original casing. Checking only
+          # the include side turns both of these into a failure four minutes in.
+          um=""
+          for a in x64 x86_64; do
+            [ -d "$splat/sdk/lib/um/$a" ] && { um="$splat/sdk/lib/um/$a"; break; }
+          done
+          [ -n "$um" ] || fail "no x64 or x86_64 library directory under $splat/sdk/lib/um"
+          [ -e "$um/kernel32.lib" ] \
+            || fail "$um has no lowercase kernel32.lib -- re-run 'xwin splat' with symlinks enabled"
           [ -e /usr/x86_64-w64-mingw32/sys-root/mingw/include/directx/d3d12.h ] \
             || [ -e cross/directx-headers/directx/d3d12.h ] \
             || [ -n "${DIRECTX_HEADERS:-}" ] \
