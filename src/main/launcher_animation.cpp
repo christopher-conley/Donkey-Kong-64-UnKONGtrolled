@@ -346,7 +346,7 @@ void dk64::launcher_animation_setup(recompui::LauncherMenu *menu) {
 
     launcher_context.credits_label = context.create_element<recompui::Label>(
         background_container, 
-        "DK64 Rekongpiled by Rainchus, Ballaam, KillKlli, Green Bean and UmedMuzl", 
+        "DK64 UnKONGtrolled, based on DK64 Rekongpiled by Rainchus, Ballaam, KillKlli, Green Bean and UmedMuzl", 
         recompui::LabelStyle::Small
     );
     launcher_context.credits_label->set_position(recompui::Position::Absolute);
