@@ -53,7 +53,11 @@ jobs:
           set -euo pipefail
           fail() { echo "::error::$*"; exit 1; }
           [ -f "$DK64_ROM" ] || fail "No ROM at $DK64_ROM (set the DK64_DECOMPRESSED_ROM variable)"
-          for t in cmake ninja "$CC" "$CXX"; do command -v "$t" >/dev/null || fail "missing: $t"; done
+          # clang and ld.lld are not optional: patches/ cross-compiles to MIPS and
+          # CMakeLists.txt:118,122 default PATCHES_C_COMPILER/PATCHES_LD to them.
+          for t in cmake ninja clang ld.lld "$CC" "$CXX"; do
+            command -v "$t" >/dev/null || fail "missing: $t"
+          done
           # CMakeLists.txt:308 links -static-libstdc++, so a 64-bit libstdc++.a
           # must exist for the compiler in use.
           p=$("$CXX" -print-file-name=libstdc++.a)
@@ -106,11 +110,16 @@ jobs:
           [ -z "$found" ] || { echo "::error::ROM or symlink staged for upload:"; echo "$found"; exit 1; }
           echo "dist is clean ($(du -sh dist | cut -f1))"
 
+      # upload-artifact zips without file modes, so a bare binary would arrive
+      # without +x and the published Linux build would not run. Tar first.
+      - name: Archive
+        run: tar -czf DK64Recompiled-linux-x64.tar.gz -C dist .
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: DK64Recompiled-linux-x64
-          path: dist/
+          path: DK64Recompiled-linux-x64.tar.gz
           if-no-files-found: error
 
   # ------------------------------------------------------------ windows cross
@@ -169,11 +178,14 @@ jobs:
           [ -z "$found" ] || { echo "::error::ROM or symlink staged for upload:"; echo "$found"; exit 1; }
           echo "dist is clean ($(du -sh build-win/dist | cut -f1))"
 
+      - name: Archive
+        run: tar -czf DK64Recompiled-windows-x64.tar.gz -C build-win/dist .
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: DK64Recompiled-windows-x64
-          path: build-win/dist/
+          path: DK64Recompiled-windows-x64.tar.gz
           if-no-files-found: error
 
   # ------------------------------------------------------------------ release
@@ -201,18 +213,18 @@ jobs:
             echo
             echo "| input | revision |"
             echo "|---|---|"
-            git submodule status --recursive \
+            git submodule status \
               | awk '{gsub(/^[ +-]/,"",$1); print "| `" $2 "` | `" substr($1,1,12) "` |"}'
             echo "| decompressed ROM (sha1) | \`$(sha1sum "$DK64_ROM" | cut -c1-40)\` |"
           } > notes.md
           cat notes.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Package
+      - name: Collect
         run: |
           set -euo pipefail
-          cd artifacts
-          for d in */; do tar -czf "../${d%/}.tar.gz" -C "$d" .; done
-          cd .. && sha256sum ./*.tar.gz > SHA256SUMS
+          find artifacts -name '*.tar.gz' -exec mv {} . \;
+          sha256sum ./*.tar.gz > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Release
         uses: softprops/action-gh-release@v2
