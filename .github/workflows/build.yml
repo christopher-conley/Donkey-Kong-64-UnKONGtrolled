@@ -122,6 +122,16 @@ jobs:
           # back when working out why a build was slow.
           echo "--- ccache (linux) ---"
           ccache --show-stats -v || ccache --show-stats
+          # A cache that caches nothing is indistinguishable from one that
+          # works, except slower -- which is how ccache 4.7.5 quietly added
+          # nothing to this build while reporting success. Check the property,
+          # not the presence of the binary.
+          cacheable=$(ccache --print-stats 2>/dev/null | awk '
+            $1=="direct_cache_hit" || $1=="preprocessed_cache_hit" || $1=="cache_miss" {n+=$2}
+            END {print n+0}')
+          if [ "${cacheable:-0}" -eq 0 ]; then
+            echo "::warning::ccache handled no cacheable compilations ($(ccache --version | head -1)). 4.7.5 (Debian bookworm) cannot cache this project's clang-cl calls; 4.12.3 can. Check the version on the runner."
+          fi
           { echo '### ccache (linux)'; echo '```'; ccache --show-stats; echo '```'; } \
             >> "$GITHUB_STEP_SUMMARY"
 
@@ -229,6 +239,16 @@ jobs:
           # back when working out why a build was slow.
           echo "--- ccache (windows) ---"
           ccache --show-stats -v || ccache --show-stats
+          # A cache that caches nothing is indistinguishable from one that
+          # works, except slower -- which is how ccache 4.7.5 quietly added
+          # nothing to this build while reporting success. Check the property,
+          # not the presence of the binary.
+          cacheable=$(ccache --print-stats 2>/dev/null | awk '
+            $1=="direct_cache_hit" || $1=="preprocessed_cache_hit" || $1=="cache_miss" {n+=$2}
+            END {print n+0}')
+          if [ "${cacheable:-0}" -eq 0 ]; then
+            echo "::warning::ccache handled no cacheable compilations ($(ccache --version | head -1)). 4.7.5 (Debian bookworm) cannot cache this project's clang-cl calls; 4.12.3 can. Check the version on the runner."
+          fi
           { echo '### ccache (windows)'; echo '```'; ccache --show-stats; echo '```'; } \
             >> "$GITHUB_STEP_SUMMARY"
 
