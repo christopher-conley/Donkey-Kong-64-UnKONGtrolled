@@ -298,7 +298,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     message(STATUS "FREETYPE_INCLUDE_DIRS = ${FREETYPE_INCLUDE_DIRS}")
     message(STATUS "FREETYPE_LIBRARIES = ${FREETYPE_LIBRARIES}")
 
-    include_directories(${FREETYPE_LIBRARIES})
+    target_include_directories(DK64Recompiled PRIVATE ${FREETYPE_INCLUDE_DIRS})
     target_link_libraries(DK64Recompiled PRIVATE ${FREETYPE_LIBRARIES} SDL2::SDL2)
 
     set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
