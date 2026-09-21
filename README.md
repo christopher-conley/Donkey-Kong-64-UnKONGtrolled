@@ -81,7 +81,7 @@ Saving, loading, transitioning between areas, and pausing are all effectively in
 #### Linux and Steam Deck Support
 A Linux binary is available for most up-to-date distros, including Steam Deck.
 
-To play on Steam Deck: extract the Linux build, then in Desktop Mode right-click the `DK64Recompiled` executable and select "Add to Steam." Return to Gaming Mode and configure controls as needed.
+To play on Steam Deck: extract the Linux build, then in Desktop Mode right-click the `DK64UnKONGtrolled` executable and select "Add to Steam." Return to Gaming Mode and configure controls as needed.
 
 ---
 

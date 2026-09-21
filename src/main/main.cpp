@@ -755,6 +755,10 @@ int main(int argc, char** argv) {
     // Initialize program settings.
     recompui::programconfig::set_program_name(dk64::program_name);
     recompui::programconfig::set_program_id(dk64::program_id);
+
+    // Import settings and saves from the pre-rename directory, if this is the
+    // first launch under the new id. Must precede anything that reads config.
+    dk64::migrate_legacy_config();
     
     // Initialize SDL audio and set the output frequency.
     SDL_InitSubSystem(SDL_INIT_AUDIO);
