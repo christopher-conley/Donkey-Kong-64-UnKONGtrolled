@@ -49,7 +49,16 @@ echo "==> configure"
 # NOTE: CMAKE_*_FLAGS_INIT only seeds a fresh cache. Editing the toolchain file and
 # re-running configure over an existing build dir silently changes nothing.
 rm -rf "$BUILD"
+# ccache if it is installed, since this script is also run by hand. The build
+# directory is removed above and, in CI, the checkout is cleaned before every
+# run, so the compiler cache is the only thing that carries work between builds.
+CCACHE_ARGS=()
+if command -v ccache >/dev/null; then
+    CCACHE_ARGS=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+    echo "    using ccache ($(ccache --version | head -1))"
+fi
 cmake -S "$REPO" -B "$BUILD" -G Ninja \
+    "${CCACHE_ARGS[@]}" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="$REPO/xwin-clang-cl.cmake" \
     -DVCPKG_MANIFEST_MODE=OFF \
