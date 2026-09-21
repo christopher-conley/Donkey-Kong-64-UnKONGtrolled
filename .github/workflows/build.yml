@@ -1,18 +1,17 @@
-# Builds DK64Recompiled for Linux x64 and Windows x64 on a self-hosted runner.
+# Builds DK64Recompiled for Linux x64 and Windows x64 
 #
-# Why self-hosted: every codegen step needs the decompressed ROM, which cannot be
-# placed on GitHub in any form. The ROM lives on the runner's disk, outside the
-# workspace, and never enters the repository or an artifact.
+# Why self-hosted: the build process requires resources (see BUILDING.md) that cannot be
+# stored at GitHub in any form. The necessary assets live outside the
+# workspace, and never enter the repository or an artifact.
 #
-# Every step here was verified by running it end to end before this file was written.
 name: build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, ci-pipeline ]
     tags: [ 'v*' ]
-  pull_request:
-    types: [ opened, synchronize ]
+ # pull_request:
+ #   types: [ opened, synchronize ]
   workflow_dispatch:
 
 concurrency:
@@ -23,11 +22,11 @@ permissions:
   contents: read
 
 env:
-  # Absolute path on the runner to the decompressed ROM. MUST be outside the
-  # workspace: actions/checkout runs `git clean -ffdx` and would delete it.
+  # Absolute path on the runner to the decompressed asset blob. MUST be outside the
+  # runner's workspace: actions/checkout runs `git clean -ffdx` and would delete it.
   # Override with a repository variable rather than editing this file.
-  DK64_ROM: ${{ vars.DK64_DECOMPRESSED_ROM || '/opt/dk64/donkeykong64.decompressed.us.z64' }}
-  ROM_NAME: donkeykong64.decompressed.us.z64
+  ASSET_PATH: ${{ secrets.DECOMPRESSED_ASSET_PATH }}
+  ASSET_FILENAME: ${{ secrets.ASSET_FILENAME }}
   # CMake honours CC/CXX. Override per-runner with repository variables: the
   # default g++ must have a 64-bit libstdc++.a (see the Linux preflight).
   CC: ${{ vars.DK64_CC || 'gcc' }}
@@ -36,9 +35,9 @@ env:
 jobs:
   # ---------------------------------------------------------------- linux x64
   linux-x64:
-    # Fork PRs must never run here. The runner is a real machine with the ROM on
-    # its disk, and a fork PR would execute arbitrary code on it. Secrets being
-    # withheld from forks does not help: the ROM is a file, not a secret.
+    # Fork PRs must never run here. The runner is a real machine with protected
+    # assets, and a fork PR would execute arbitrary code on it. Secrets being
+    # withheld from forks does not help with that.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted
     steps:
@@ -48,11 +47,17 @@ jobs:
           submodules: recursive   # lib/N64Recomp has its own submodules; without
                                   # this, CMake fails on a missing lib/fmt.
 
+      - name: Set short SHA
+        id: short_sha
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
       - name: Preflight
         run: |
           set -euo pipefail
           fail() { echo "::error::$*"; exit 1; }
-          [ -f "$DK64_ROM" ] || fail "No ROM at $DK64_ROM (set the DK64_DECOMPRESSED_ROM variable)"
+          [ -f "$ASSET_PATH" ] || fail "No asset at $ASSET_PATH (set the DECOMPRESSED_ASSET_PATH variable)"
           # clang and ld.lld are not optional: patches/ cross-compiles to MIPS and
           # CMakeLists.txt:118,122 default PATCHES_C_COMPILER/PATCHES_LD to them.
           for t in cmake ninja clang ld.lld "$CC" "$CXX"; do
@@ -76,10 +81,10 @@ jobs:
           cmake --build build-n64recomp --target N64RecompCLI RSPRecomp -j"$(nproc)"
           cp build-n64recomp/N64Recomp build-n64recomp/RSPRecomp .
 
-      - name: Generate C from the ROM
+      - name: Generate necessary C file from the asset file
         run: |
           set -euo pipefail
-          ln -sfn "$DK64_ROM" "$ROM_NAME"
+          ln -sfn "$ASSET_PATH" "$ASSET_FILENAME"
           ./N64Recomp us.toml
           ./RSPRecomp n_aspMain.toml
 
@@ -103,23 +108,23 @@ jobs:
           cp -r assets dist/
           cp recompcontrollerdb.txt dist/
 
-      - name: Guard - no ROM in the artifact
+      - name: Guard - no asset files in the artifact
         run: |
           set -euo pipefail
           found=$(find dist \( -iname '*.z64' -o -iname '*.v64' -o -iname '*.n64' -o -type l \))
-          [ -z "$found" ] || { echo "::error::ROM or symlink staged for upload:"; echo "$found"; exit 1; }
+          [ -z "$found" ] || { echo "::error::asset file or symlink staged for upload:"; echo "$found"; exit 1; }
           echo "dist is clean ($(du -sh dist | cut -f1))"
 
       # upload-artifact zips without file modes, so a bare binary would arrive
       # without +x and the published Linux build would not run. Tar first.
       - name: Archive
-        run: tar -czf DK64Recompiled-linux-x64.tar.gz -C dist .
+        run: tar -czf DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64.tar.gz -C dist .
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: DK64Recompiled-linux-x64
-          path: DK64Recompiled-linux-x64.tar.gz
+          name: DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64
+          path: DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64.tar.gz
           if-no-files-found: error
 
   # ------------------------------------------------------------ windows cross
@@ -132,11 +137,17 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Set short SHA
+        id: short_sha
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
       - name: Preflight
         run: |
           set -euo pipefail
           fail() { echo "::error::$*"; exit 1; }
-          [ -f "$DK64_ROM" ] || fail "No ROM at $DK64_ROM"
+          [ -f "$ASSET_PATH" ] || fail "No asset at $ASSET_PATH"
           for t in clang-cl lld-link llvm-lib llvm-rc llvm-mt wine gendef cmake ninja; do
             command -v "$t" >/dev/null || fail "missing: $t"
           done
@@ -165,27 +176,27 @@ jobs:
             --overlay-triplets="$PWD/lib/vcpkg/triplets/community" \
             --clean-buildtrees-after-build
 
-      - name: Supply the ROM
-        run: ln -sfn "$DK64_ROM" "$ROM_NAME"
+      - name: Supply the asset file
+        run: ln -sfn "$ASSET_PATH" "$ASSET_FILENAME"
 
       - name: Build
         run: WINEDEBUG=-all ./cross/build-windows.sh
 
-      - name: Guard - no ROM in the artifact
+      - name: Guard - no asset files in the artifact
         run: |
           set -euo pipefail
           found=$(find build-win/dist \( -iname '*.z64' -o -iname '*.v64' -o -iname '*.n64' -o -type l \))
-          [ -z "$found" ] || { echo "::error::ROM or symlink staged for upload:"; echo "$found"; exit 1; }
+          [ -z "$found" ] || { echo "::error::asset file or symlink staged for upload:"; echo "$found"; exit 1; }
           echo "dist is clean ($(du -sh build-win/dist | cut -f1))"
 
       - name: Archive
-        run: tar -czf DK64Recompiled-windows-x64.tar.gz -C build-win/dist .
+        run: tar -czf DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-windows-x64.tar.gz -C build-win/dist .
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: DK64Recompiled-windows-x64
-          path: DK64Recompiled-windows-x64.tar.gz
+          name: DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-windows-x64
+          path: DK64Recompiled-${{ steps.short_sha.outputs.SHORT_SHA }}-windows-x64.tar.gz
           if-no-files-found: error
 
   # ------------------------------------------------------------------ release
@@ -215,7 +226,7 @@ jobs:
             echo "|---|---|"
             git submodule status \
               | awk '{gsub(/^[ +-]/,"",$1); print "| `" $2 "` | `" substr($1,1,12) "` |"}'
-            echo "| decompressed ROM (sha1) | \`$(sha1sum "$DK64_ROM" | cut -c1-40)\` |"
+            echo "| decompressed asset (sha1) | \`$(sha1sum "$ASSET_PATH" | cut -c1-40)\` |"
           } > notes.md
           cat notes.md >> "$GITHUB_STEP_SUMMARY"
 
