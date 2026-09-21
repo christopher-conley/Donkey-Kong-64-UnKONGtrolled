@@ -1,0 +1,223 @@
+# Builds DK64Recompiled for Linux x64 and Windows x64 on a self-hosted runner.
+#
+# Why self-hosted: every codegen step needs the decompressed ROM, which cannot be
+# placed on GitHub in any form. The ROM lives on the runner's disk, outside the
+# workspace, and never enters the repository or an artifact.
+#
+# Every step here was verified by running it end to end before this file was written.
+name: build
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    types: [ opened, synchronize ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Absolute path on the runner to the decompressed ROM. MUST be outside the
+  # workspace: actions/checkout runs `git clean -ffdx` and would delete it.
+  # Override with a repository variable rather than editing this file.
+  DK64_ROM: ${{ vars.DK64_DECOMPRESSED_ROM || '/opt/dk64/donkeykong64.decompressed.us.z64' }}
+  ROM_NAME: donkeykong64.decompressed.us.z64
+  # CMake honours CC/CXX. Override per-runner with repository variables: the
+  # default g++ must have a 64-bit libstdc++.a (see the Linux preflight).
+  CC: ${{ vars.DK64_CC || 'gcc' }}
+  CXX: ${{ vars.DK64_CXX || 'g++' }}
+
+jobs:
+  # ---------------------------------------------------------------- linux x64
+  linux-x64:
+    # Fork PRs must never run here. The runner is a real machine with the ROM on
+    # its disk, and a fork PR would execute arbitrary code on it. Secrets being
+    # withheld from forks does not help: the ROM is a file, not a secret.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive   # lib/N64Recomp has its own submodules; without
+                                  # this, CMake fails on a missing lib/fmt.
+
+      - name: Preflight
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [ -f "$DK64_ROM" ] || fail "No ROM at $DK64_ROM (set the DK64_DECOMPRESSED_ROM variable)"
+          for t in cmake ninja "$CC" "$CXX"; do command -v "$t" >/dev/null || fail "missing: $t"; done
+          # CMakeLists.txt:308 links -static-libstdc++, so a 64-bit libstdc++.a
+          # must exist for the compiler in use.
+          p=$("$CXX" -print-file-name=libstdc++.a)
+          case "$p" in
+              /*) [ -f "$p" ] || fail "libstdc++.a path from $CXX is not a file: $p" ;;
+              *)  fail "no 64-bit libstdc++.a for $CXX (Fedora: libstdc++-static). CMakeLists.txt:308 links -static-libstdc++." ;;
+          esac
+          echo "### Toolchain" >> "$GITHUB_STEP_SUMMARY"
+          { "$CXX" --version | head -1; cmake --version | head -1; ninja --version; } \
+            | sed 's/^/    /' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build the recompilers
+        run: |
+          set -euo pipefail
+          cmake -S lib/N64Recomp -B build-n64recomp -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-n64recomp --target N64RecompCLI RSPRecomp -j"$(nproc)"
+          cp build-n64recomp/N64Recomp build-n64recomp/RSPRecomp .
+
+      - name: Generate C from the ROM
+        run: |
+          set -euo pipefail
+          ln -sfn "$DK64_ROM" "$ROM_NAME"
+          ./N64Recomp us.toml
+          ./RSPRecomp n_aspMain.toml
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          # -include cstdint: RmlUi's vendored robin_hood.h uses uint64_t without
+          # including <cstdint>; it only ever compiled via transitive includes.
+          # --allow-multiple-definition: as in fedora_build.sh.
+          cmake -S . -B build-linux -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS="-include cstdint" \
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-multiple-definition"
+          cmake --build build-linux --target DK64Recompiled -j"$(nproc)"
+
+      - name: Stage
+        run: |
+          set -euo pipefail
+          rm -rf dist && mkdir -p dist
+          cp build-linux/DK64Recompiled dist/
+          cp -r assets dist/
+          cp recompcontrollerdb.txt dist/
+
+      - name: Guard - no ROM in the artifact
+        run: |
+          set -euo pipefail
+          found=$(find dist \( -iname '*.z64' -o -iname '*.v64' -o -iname '*.n64' -o -type l \))
+          [ -z "$found" ] || { echo "::error::ROM or symlink staged for upload:"; echo "$found"; exit 1; }
+          echo "dist is clean ($(du -sh dist | cut -f1))"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: DK64Recompiled-linux-x64
+          path: dist/
+          if-no-files-found: error
+
+  # ------------------------------------------------------------ windows cross
+  windows-cross:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Preflight
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [ -f "$DK64_ROM" ] || fail "No ROM at $DK64_ROM"
+          for t in clang-cl lld-link llvm-lib llvm-rc llvm-mt wine gendef cmake ninja; do
+            command -v "$t" >/dev/null || fail "missing: $t"
+          done
+          [ -d "${XWIN_SPLAT:-$HOME/.cache/xwin/splat}/crt/include" ] \
+            || fail "no xwin splat (xwin --accept-license splat)"
+          [ -e /usr/x86_64-w64-mingw32/sys-root/mingw/include/directx/d3d12.h ] \
+            || [ -e cross/directx-headers/directx/d3d12.h ] \
+            || [ -n "${DIRECTX_HEADERS:-}" ] \
+            || fail "no DirectX-Headers (the xwin SDK's d3d12.h is too old)"
+
+      - name: Build the recompilers
+        run: |
+          set -euo pipefail
+          cmake -S lib/N64Recomp -B build-n64recomp -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-n64recomp --target N64RecompCLI RSPRecomp -j"$(nproc)"
+          cp build-n64recomp/N64Recomp build-n64recomp/RSPRecomp .
+
+      - name: libcurl for the MSVC ABI
+        run: |
+          set -euo pipefail
+          [ -x lib/vcpkg/vcpkg ] || ( cd lib/vcpkg && ./bootstrap-vcpkg.sh -disableMetrics )
+          # --classic: the repo has a vcpkg.json, which otherwise puts vcpkg in
+          # manifest mode, where per-package arguments are rejected outright.
+          ./lib/vcpkg/vcpkg install --classic curl:x64-mingw-dynamic-release \
+            --x-install-root="$PWD/vcpkg_installed" \
+            --overlay-triplets="$PWD/lib/vcpkg/triplets/community" \
+            --clean-buildtrees-after-build
+
+      - name: Supply the ROM
+        run: ln -sfn "$DK64_ROM" "$ROM_NAME"
+
+      - name: Build
+        run: WINEDEBUG=-all ./cross/build-windows.sh
+
+      - name: Guard - no ROM in the artifact
+        run: |
+          set -euo pipefail
+          found=$(find build-win/dist \( -iname '*.z64' -o -iname '*.v64' -o -iname '*.n64' -o -type l \))
+          [ -z "$found" ] || { echo "::error::ROM or symlink staged for upload:"; echo "$found"; exit 1; }
+          echo "dist is clean ($(du -sh build-win/dist | cut -f1))"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: DK64Recompiled-windows-x64
+          path: build-win/dist/
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ release
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ linux-x64, windows-cross ]
+    runs-on: self-hosted
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Provenance
+        id: prov
+        run: |
+          set -euo pipefail
+          {
+            echo "Built from \`${GITHUB_SHA}\` on a self-hosted runner."
+            echo
+            echo "| input | revision |"
+            echo "|---|---|"
+            git submodule status --recursive \
+              | awk '{gsub(/^[ +-]/,"",$1); print "| `" $2 "` | `" substr($1,1,12) "` |"}'
+            echo "| decompressed ROM (sha1) | \`$(sha1sum "$DK64_ROM" | cut -c1-40)\` |"
+          } > notes.md
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          cd artifacts
+          for d in */; do tar -czf "../${d%/}.tar.gz" -C "$d" .; done
+          cd .. && sha256sum ./*.tar.gz > SHA256SUMS
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: |
+            *.tar.gz
+            SHA256SUMS
