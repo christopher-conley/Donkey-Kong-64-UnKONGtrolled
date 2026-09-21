@@ -94,8 +94,15 @@ Static recompilation is the process of automatically [translating an application
 This project is not based on decompiled source code. Static recompilation bypasses the need for decompiled source when making a port. However, the reverse engineering work done by the decompilation team was invaluable for certain enhancements — the project uses headers and some function definitions from the decompilation project for this purpose.
 
 #### Where is the save file stored?
-- **Windows:** `%LOCALAPPDATA%\DK64Recompiled\saves`
-- **Linux:** `~/.config/DK64Recompiled/saves`
+- **Windows:** `%LOCALAPPDATA%\DK64UnKONGtrolled\saves`
+- **Linux:** `~/.config/DK64UnKONGtrolled/saves`
+
+If you previously used DK64: Rekongpiled, your settings and saves are copied from
+its folder (`DK64Recompiled`) the first time you launch this build. The copy is
+one-way and happens once: the old folder is left exactly as it is, so the other
+build keeps working, but anything you do from then on — saves, settings, mods —
+is written to the `DK64UnKONGtrolled` folder above and will not appear in the old
+one. If you want to go back to a save made here, copy it across yourself.
 
 #### How do I choose a different ROM?
 **You don't.** This project is a port of one specific game from one specific release: the US N64 version of Donkey Kong 64. It is not an emulator. ROMs in formats other than `.z64` will be automatically converted as long as they are the correct ROM.
