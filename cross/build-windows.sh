@@ -11,7 +11,8 @@
 #   clang-cl, lld-link, llvm-lib, llvm-rc, llvm-mt, cmake, ninja   (clang + llvm)
 #   wine                     -- runs the Windows dxc.exe to compile and SIGN shaders
 #   gendef                   -- mingw-w64-tools, for the libcurl import library
-#   an xwin splat            -- xwin --accept-license splat   (~2.4 GB, one time)
+#   an xwin splat            -- xwin --accept-license splat   (~2.4 GB, one time;
+#                               lands in ~/.xwin-cache/splat)
 #   DirectX-Headers          -- the SDK xwin fetches predates D3D12_HEAP_TYPE_GPU_UPLOAD
 #
 # Usage: cross/build-windows.sh [build-dir]
@@ -19,7 +20,18 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="${1:-$REPO/build-win}"
-: "${XWIN_SPLAT:=$HOME/.cache/xwin/splat}"
+# xwin writes to ./.xwin-cache/splat by default, so the documented
+# `xwin --accept-license splat` leaves it at ~/.xwin-cache/splat. This script
+# previously defaulted to ~/.cache/xwin/splat, which was never an xwin default:
+# it was where an unrelated project's splat happened to sit on the machine this
+# was first written on. That path is still checked, so such a splat keeps
+# working, but it is the fallback rather than the assumption.
+if [ -z "${XWIN_SPLAT:-}" ]; then
+    for _c in "$HOME/.xwin-cache/splat" "$HOME/.cache/xwin/splat"; do
+        [ -d "$_c/crt/include" ] && { XWIN_SPLAT="$_c"; break; }
+    done
+    : "${XWIN_SPLAT:=$HOME/.xwin-cache/splat}"
+fi
 : "${DIRECTX_HEADERS:=}"
 CURL_PREFIX="$REPO/vcpkg_installed/x64-mingw-dynamic-release"
 

@@ -9,7 +9,7 @@
 # the one that gets compiled, exactly as upstream intends.
 #
 # Prerequisites:
-#   xwin splat at $ENV{XWIN_SPLAT} (default ~/.cache/xwin/splat), created with e.g.
+#   xwin splat at $ENV{XWIN_SPLAT}, or ~/.xwin-cache/splat, created with
 #     xwin --accept-license splat
 #   DirectX-Headers for a current d3d12.h, at $ENV{DIRECTX_HEADERS}.
 #   The Windows SDK 10.0.22621 that xwin fetches predates D3D12_HEAP_TYPE_GPU_UPLOAD,
@@ -21,7 +21,19 @@ set(CMAKE_SYSTEM_PROCESSOR AMD64)
 if (DEFINED ENV{XWIN_SPLAT})
     set(XWIN_SPLAT $ENV{XWIN_SPLAT})
 else()
-    set(XWIN_SPLAT "$ENV{HOME}/.cache/xwin/splat")
+    # xwin's own default output is ./.xwin-cache/splat, relative to where it
+    # was run, so `xwin --accept-license splat` from a home directory puts it at
+    # ~/.xwin-cache/splat. The second path below was this file's original
+    # default and was never an xwin default: it was where an unrelated
+    # project's splat sat on the machine this was written on. It stays as a
+    # fallback so such a splat keeps working.
+    set(XWIN_SPLAT "$ENV{HOME}/.xwin-cache/splat")
+    foreach(_c "$ENV{HOME}/.xwin-cache/splat" "$ENV{HOME}/.cache/xwin/splat")
+        if (IS_DIRECTORY "${_c}/crt/include")
+            set(XWIN_SPLAT "${_c}")
+            break()
+        endif()
+    endforeach()
 endif()
 
 if (NOT EXISTS "${XWIN_SPLAT}/crt/include")
@@ -98,10 +110,10 @@ foreach(_d "${CMAKE_CURRENT_LIST_DIR}/cross/case-shim-lib" "${CMAKE_CURRENT_LIST
     endif()
 endforeach()
 
-# xwin has shipped the x86-64 library directories under both "x64" and
-# "x86_64" depending on its version, so probe rather than assume. A wrong
-# guess here does not fail until the first link, with every import library
-# reported missing at once.
+# xwin names the x86-64 library directories "x86_64" by default and "x64"
+# only when splatted with --preserve-ms-arch-notation, so probe rather than
+# assume. A wrong guess here does not fail until the first link, with every
+# import library reported missing at once.
 function(_xwin_libdir out base)
     foreach(_a x64 x86_64)
         if (IS_DIRECTORY "${base}/${_a}")

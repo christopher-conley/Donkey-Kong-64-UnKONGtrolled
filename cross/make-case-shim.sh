@@ -14,7 +14,12 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SPLAT="${XWIN_SPLAT:-$HOME/.cache/xwin/splat}"
+# See cross/build-windows.sh: ~/.xwin-cache/splat is where an unflagged
+# `xwin splat` lands; the second path is a fallback for an existing splat.
+SPLAT="${XWIN_SPLAT:-}"
+[ -n "$SPLAT" ] || for _c in "$HOME/.xwin-cache/splat" "$HOME/.cache/xwin/splat"; do
+    [ -d "$_c/crt/include" ] && { SPLAT="$_c"; break; }
+done
 SHIM="$REPO/cross/case-shim"
 LIBSHIM="$REPO/cross/case-shim-lib"
 
@@ -60,8 +65,9 @@ echo "$linked case-correcting symlink(s) in $SHIM"
 # Same problem one layer down: rt64 links Shcore.lib, the top-level CMakeLists links
 # Winmm.lib, and the SDK ships shcore.lib / SHCORE.lib / WinMM.Lib. lld-link does not
 # guess, so link case-correcting symlinks for every .lib named in a CMakeLists here.
-# xwin has shipped these under both x64 and x86_64 depending on its version.
-# Probing matters more here than elsewhere: a wrong guess finds no directories,
+# xwin names these "x86_64" by default, "x64" only with
+# --preserve-ms-arch-notation. Probing matters more here than elsewhere: a
+# wrong guess finds no directories,
 # links nothing, reports "0 symlinks" as though that were a result, and the
 # build fails twenty minutes later at the final link.
 LIBDIRS=()

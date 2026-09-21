@@ -189,10 +189,18 @@ jobs:
           for t in clang-cl lld-link llvm-lib llvm-rc llvm-mt wine gendef cmake ninja ccache; do
             command -v "$t" >/dev/null || fail "missing: $t"
           done
-          splat="${XWIN_SPLAT:-$HOME/.cache/xwin/splat}"
+          splat="${XWIN_SPLAT:-}"
+          # `xwin splat` writes to ./.xwin-cache/splat, so the documented
+          # command leaves it at ~/.xwin-cache/splat. The second path is not an
+          # older xwin default -- it is only checked so a splat that already
+          # lives there keeps working.
+          [ -n "$splat" ] || for c in "$HOME/.xwin-cache/splat" "$HOME/.cache/xwin/splat"; do
+            [ -d "$c/crt/include" ] && { splat="$c"; break; }
+          done
           [ -d "$splat/crt/include" ] || fail "no xwin splat at $splat"
-          # The headers existing does not mean the libraries do. xwin has used
-          # both x64 and x86_64 for the arch directory, and lld-link needs the
+          # The headers existing does not mean the libraries do. xwin uses
+          # x86_64 by default and x64 only with --preserve-ms-arch-notation,
+          # and lld-link needs the
           # lowercase symlinks beside the SDK's original casing. Checking only
           # the include side turns both of these into a failure four minutes in.
           um=""
