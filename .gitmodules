@@ -5,6 +5,7 @@
 [submodule "lib/rt64"]
 	path = lib/rt64
 	url = https://github.com/christopher-conley/rt64.git
+	branch = dk64-crossbuild
 [submodule "lib/RecompFrontend"]
 	path = lib/RecompFrontend
 	url = https://github.com/Killklli/RecompFrontend
