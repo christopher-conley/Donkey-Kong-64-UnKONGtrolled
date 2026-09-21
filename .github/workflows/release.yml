@@ -111,8 +111,15 @@ jobs:
           win=$(find artifacts -maxdepth 1 -type d -name '*-windows-x64' | head -1)
           [ -n "$win" ] || { echo "::error::no Windows artifact directory"; exit 1; }
           ( cd "$win" && zip -qr "$GITHUB_WORKSPACE/DK64UnKONGtrolled-$label-windows-x64.zip" . )
-          sha256sum DK64UnKONGtrolled-*.tar.gz DK64UnKONGtrolled-*.zip > SHA256SUMS
+          # Checksums in binary mode ("hash *file"), the explicit form a Windows sha256sum
+          # also expects. One .sha256 per archive so each download has its checksum beside
+          # it, plus the combined SHA256SUMS. Verify with: sha256sum -c <file>.sha256
+          for f in DK64UnKONGtrolled-*.tar.gz DK64UnKONGtrolled-*.zip; do
+            sha256sum -b "$f" > "$f.sha256"
+          done
+          sha256sum -b DK64UnKONGtrolled-*.tar.gz DK64UnKONGtrolled-*.zip > SHA256SUMS
           cat SHA256SUMS
+          sha256sum -c ./*.sha256   # prove each file verifies before it is published
 
       - name: Notes
         run: |
@@ -137,4 +144,5 @@ jobs:
           files: |
             DK64UnKONGtrolled-*.tar.gz
             DK64UnKONGtrolled-*.zip
+            DK64UnKONGtrolled-*.sha256
             SHA256SUMS
