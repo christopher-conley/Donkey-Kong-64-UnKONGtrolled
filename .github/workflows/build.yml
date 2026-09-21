@@ -36,6 +36,16 @@ env:
   # only caching mechanism that survives that, which is why build directories
   # are not worth trying to preserve.
   CCACHE_DIR: ${{ vars.CCACHE_DIR || '/home/actionsrunner/cache/ccache' }}
+  # RmlUi's Core builds with a precompiled header, and ccache refuses those by
+  # default -- 187 of 735 calls on Windows, 188 of 677 on Linux, a quarter of
+  # each build. These two sloppiness settings are what ccache documents as the
+  # requirement for caching PCH compilations.
+  #
+  # time_macros means ccache ignores __DATE__ and __TIME__ differences, which
+  # would be unsafe if any compiled translation unit embedded its build
+  # timestamp. None does: the only occurrences anywhere under src, include or
+  # lib are in miniz's test program, which this project does not build.
+  CCACHE_SLOPPINESS: pch_defines,time_macros
 
 jobs:
   # ---------------------------------------------------------------- linux x64
