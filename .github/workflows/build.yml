@@ -38,7 +38,14 @@ jobs:
     # Fork PRs must never run here. The runner is a real machine with protected
     # assets, and a fork PR would execute arbitrary code on it. Secrets being
     # withheld from forks does not help with that.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Skips are opt-in from two directions, and both default to running: an unset
+    # variable or an absent commit-message tag must never silently disable a
+    # target. vars.SKIP_* is the sticky switch, [skip linux] in a commit message
+    # is the one-off.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && vars.SKIP_LINUX != 'true'
+      && !contains(github.event.head_commit.message, '[skip linux]')
     runs-on: self-hosted
     steps:
       - name: Checkout
@@ -129,7 +136,10 @@ jobs:
 
   # ------------------------------------------------------------ windows cross
   windows-cross:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && vars.SKIP_WINDOWS != 'true'
+      && !contains(github.event.head_commit.message, '[skip windows]')
     runs-on: self-hosted
     steps:
       - name: Checkout
@@ -212,6 +222,8 @@ jobs:
 
   # ------------------------------------------------------------------ release
   release:
+    # Deliberately requires both targets. A skipped job makes this one skip too,
+    # so a tag built with SKIP_* set publishes nothing rather than half a release.
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [ linux-x64, windows-cross ]
     runs-on: self-hosted
