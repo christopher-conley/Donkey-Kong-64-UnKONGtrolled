@@ -60,7 +60,21 @@ echo "$linked case-correcting symlink(s) in $SHIM"
 # Same problem one layer down: rt64 links Shcore.lib, the top-level CMakeLists links
 # Winmm.lib, and the SDK ships shcore.lib / SHCORE.lib / WinMM.Lib. lld-link does not
 # guess, so link case-correcting symlinks for every .lib named in a CMakeLists here.
-LIBDIRS=("$SPLAT/sdk/lib/um/x64" "$SPLAT/sdk/lib/ucrt/x64" "$SPLAT/crt/lib/x64")
+# xwin has shipped these under both x64 and x86_64 depending on its version.
+# Probing matters more here than elsewhere: a wrong guess finds no directories,
+# links nothing, reports "0 symlinks" as though that were a result, and the
+# build fails twenty minutes later at the final link.
+LIBDIRS=()
+for _base in "$SPLAT/sdk/lib/um" "$SPLAT/sdk/lib/ucrt" "$SPLAT/crt/lib"; do
+    for _a in x64 x86_64; do
+        [ -d "$_base/$_a" ] && { LIBDIRS+=("$_base/$_a"); break; }
+    done
+done
+[ ${#LIBDIRS[@]} -eq 3 ] || {
+    echo "only found ${#LIBDIRS[@]} of 3 library directories under $SPLAT" >&2
+    echo "  expected x64 or x86_64 under sdk/lib/um, sdk/lib/ucrt and crt/lib" >&2
+    exit 1
+}
 
 mapfile -t LIBS < <(
     grep -rhoE '\b[A-Za-z0-9_]+\.[Ll][Ii][Bb]\b' \
@@ -85,3 +99,10 @@ for l in "${LIBS[@]}"; do
     done
 done
 echo "$liblinked case-correcting library symlink(s) in $LIBSHIM"
+# Zero is not a plausible outcome: the tree names .lib files whose casing on
+# disk differs, which is the reason this script exists. Zero means the search
+# found nothing to search, so say so here rather than at the final link.
+[ "$liblinked" -gt 0 ] || {
+    echo "no library symlinks created -- searched: ${LIBDIRS[*]}" >&2
+    exit 1
+}
