@@ -321,6 +321,15 @@ set (DXC_RT_OPTS "${DXC_COMMON_OPTS}" "-D" "RT_SHADER" "-T" "lib_6_3" "-fspv-tar
 
 if (${WIN32})
     set (DXC "${PROJECT_SOURCE_DIR}/lib/rt64/src/contrib/dxc/bin/x64/dxc.exe")
+    # Cross-compiling to Windows from a non-Windows host: dxc.exe is a PE binary that
+    # the build has to execute, and wine does not translate Unix paths passed to -I --
+    # dxc compiles the top-level .hlsl and then fails on its first #include.
+    # cross/dxc-wine runs it under wine with the paths converted.
+    # CMAKE_HOST_WIN32 excludes a Windows host cross-compiling to another Windows
+    # architecture (x64 -> ARM64), which needs no wrapper.
+    if (CMAKE_CROSSCOMPILING AND NOT CMAKE_HOST_WIN32 AND EXISTS "${CMAKE_SOURCE_DIR}/cross/dxc-wine")
+        set (DXC "${CMAKE_SOURCE_DIR}/cross/dxc-wine" ${DXC})
+    endif()
     add_compile_definitions(NOMINMAX)
 else()
     if (APPLE)
