@@ -65,7 +65,11 @@ DIST="$BUILD/dist"
 rm -rf "$DIST"; mkdir -p "$DIST"
 cp "$BUILD/DK64Recompiled.exe" "$DIST/"
 cp "$BUILD/SDL2.dll" "$BUILD/dxcompiler.dll" "$BUILD/dxil.dll" "$DIST/"
-cp "$CURL_PREFIX/bin/libcurl.dll" "$CURL_PREFIX/bin/libzlib1.dll" "$DIST/"
+# Everything in the triplet's bin/ is a runtime dependency of libcurl. Globbed rather
+# than named because vcpkg's zlib port has shipped the DLL as both libzlib1.dll and
+# libz.dll depending on the vcpkg revision, and a missing name fails the build here,
+# after everything has already compiled.
+cp "$CURL_PREFIX"/bin/*.dll "$DIST/"
 cp -r "$REPO/assets" "$DIST/"
 [ -f "$REPO/recompcontrollerdb.txt" ] && cp "$REPO/recompcontrollerdb.txt" "$DIST/"
 
