@@ -20,8 +20,8 @@ cmake -S . -B build-cmake \
   -G Ninja \
   -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
 
-cmake --build build-cmake --target DK64Recompiled -j$(nproc) --config "${BUILD_TYPE}"
+cmake --build build-cmake --target DK64UnKONGtrolled -j$(nproc) --config "${BUILD_TYPE}"
 
-cp build-cmake/DK64Recompiled DK64Recompiled && \
-chmod +x ./DK64Recompiled && \
-./DK64Recompiled
+cp build-cmake/DK64UnKONGtrolled DK64UnKONGtrolled && \
+chmod +x ./DK64UnKONGtrolled && \
+./DK64UnKONGtrolled

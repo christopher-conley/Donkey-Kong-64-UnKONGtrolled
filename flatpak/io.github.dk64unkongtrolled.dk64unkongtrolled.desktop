@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=DK64: UnKONGtrolled
+Exec=/app/bin/DK64UnKONGtrolled
+Type=Application
+Icon=io.github.dk64unkongtrolled.dk64unkongtrolled
+Categories=Game;
+Comment=UnKONGtrolled fork of the static recompilation of Donkey Kong 64 for PC.
+MimeType=x-scheme-handler/dk64unkongtrolled

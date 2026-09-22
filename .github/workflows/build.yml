@@ -1,0 +1,289 @@
+# Builds DK64UnKONGtrolled for Linux x64 and Windows x64 
+#
+# Why self-hosted: the build process requires resources (see BUILDING.md) that cannot be
+# stored at GitHub in any form. The necessary assets live outside the
+# workspace, and never enter the repository or an artifact.
+#
+name: build
+
+on:
+  push:
+    # No tag trigger: release.yml publishes the artifacts of the build that
+    # already ran for a commit, rather than rebuilding it when it is tagged.
+    branches: [ main, ci-pipeline ]
+ # pull_request:
+ #   types: [ opened, synchronize ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Absolute path on the runner to the decompressed asset blob. MUST be outside the
+  # runner's workspace: actions/checkout runs `git clean -ffdx` and would delete it.
+  # Override with a repository variable rather than editing this file.
+  ASSET_PATH: ${{ secrets.DECOMPRESSED_ASSET_PATH }}
+  ASSET_FILENAME: ${{ secrets.ASSET_FILENAME }}
+  # CMake honours CC/CXX. Override per-runner with repository variables: the
+  # default g++ must have a 64-bit libstdc++.a (see the Linux preflight).
+  CC: ${{ vars.DK64_CC || 'gcc' }}
+  CXX: ${{ vars.DK64_CXX || 'g++' }}
+  # Must be outside the workspace: actions/checkout runs `git clean -ffdx`, so a
+  # cache kept in the checkout would be deleted before every build. This is the
+  # only caching mechanism that survives that, which is why build directories
+  # are not worth trying to preserve.
+  CCACHE_DIR: ${{ vars.CCACHE_DIR || '/home/actionsrunner/cache/ccache' }}
+  # RmlUi's Core builds with a precompiled header, and ccache refuses those by
+  # default -- 187 of 735 calls on Windows, 188 of 677 on Linux, a quarter of
+  # each build. These two sloppiness settings are what ccache documents as the
+  # requirement for caching PCH compilations.
+  #
+  # time_macros means ccache ignores __DATE__ and __TIME__ differences, which
+  # would be unsafe if any compiled translation unit embedded its build
+  # timestamp. None does: the only occurrences anywhere under src, include or
+  # lib are in miniz's test program, which this project does not build.
+  CCACHE_SLOPPINESS: pch_defines,time_macros
+
+jobs:
+  # ---------------------------------------------------------------- linux x64
+  linux-x64:
+    # Fork PRs must never run here. The runner is a real machine with protected
+    # assets, and a fork PR would execute arbitrary code on it. Secrets being
+    # withheld from forks does not help with that.
+    # Skips are opt-in from two directions, and both default to running: an unset
+    # variable or an absent commit-message tag must never silently disable a
+    # target. vars.SKIP_* is the sticky switch, [skip linux] in a commit message
+    # is the one-off.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && vars.SKIP_LINUX != 'true'
+      && !contains(github.event.head_commit.message, '[skip linux]')
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive   # lib/N64Recomp has its own submodules; without
+                                  # this, CMake fails on a missing lib/fmt.
+
+      - name: Set short SHA
+        id: short_sha
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Preflight
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [ -f "$ASSET_PATH" ] || fail "No asset at $ASSET_PATH (set the DECOMPRESSED_ASSET_PATH variable)"
+          # clang and ld.lld are not optional: patches/ cross-compiles to MIPS and
+          # CMakeLists.txt:118,122 default PATCHES_C_COMPILER/PATCHES_LD to them.
+          for t in cmake ninja ccache clang ld.lld "$CC" "$CXX"; do
+            command -v "$t" >/dev/null || fail "missing: $t"
+          done
+          # CMakeLists.txt:308 links -static-libstdc++, so a 64-bit libstdc++.a
+          # must exist for the compiler in use.
+          p=$("$CXX" -print-file-name=libstdc++.a)
+          case "$p" in
+              /*) [ -f "$p" ] || fail "libstdc++.a path from $CXX is not a file: $p" ;;
+              *)  fail "no 64-bit libstdc++.a for $CXX (Fedora: libstdc++-static). CMakeLists.txt:308 links -static-libstdc++." ;;
+          esac
+          echo "### Toolchain" >> "$GITHUB_STEP_SUMMARY"
+          { "$CXX" --version | head -1; cmake --version | head -1; ninja --version; } \
+            | sed 's/^/    /' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build the recompilers
+        run: |
+          set -euo pipefail
+          cmake -S lib/N64Recomp -B build-n64recomp -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-n64recomp --target N64RecompCLI RSPRecomp -j"$(nproc)"
+          cp build-n64recomp/N64Recomp build-n64recomp/RSPRecomp .
+
+      - name: Generate necessary C file from the asset file
+        run: |
+          set -euo pipefail
+          ln -sfn "$ASSET_PATH" "$ASSET_FILENAME"
+          ./N64Recomp us.toml
+          ./RSPRecomp n_aspMain.toml
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          # -include cstdint: RmlUi's vendored robin_hood.h uses uint64_t without
+          # including <cstdint>; it only ever compiled via transitive includes.
+          # --allow-multiple-definition: as in fedora_build.sh.
+          mkdir -p "$CCACHE_DIR"
+          ccache --zero-stats >/dev/null
+          cmake -S . -B build-linux -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_FLAGS="-include cstdint" \
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-multiple-definition"
+          cmake --build build-linux --target DK64UnKONGtrolled -j"$(nproc)"
+          # Printed so a cache that has silently stopped working is visible
+          # rather than showing up only as a build that got slow again.
+          # Printed to the log as well as the summary: the summary is not
+          # reachable from the API, so stats that only go there cannot be read
+          # back when working out why a build was slow.
+          echo "--- ccache (linux) ---"
+          ccache --show-stats -v || ccache --show-stats
+          # A cache that caches nothing is indistinguishable from one that
+          # works, except slower -- which is how ccache 4.7.5 quietly added
+          # nothing to this build while reporting success. Check the property,
+          # not the presence of the binary.
+          cacheable=$(ccache --print-stats 2>/dev/null | awk '
+            $1=="direct_cache_hit" || $1=="preprocessed_cache_hit" || $1=="cache_miss" {n+=$2}
+            END {print n+0}')
+          if [ "${cacheable:-0}" -eq 0 ]; then
+            echo "::warning::ccache handled no cacheable compilations ($(ccache --version | head -1)). 4.7.5 (Debian bookworm) cannot cache this project's clang-cl calls; 4.12.3 can. Check the version on the runner."
+          fi
+          { echo '### ccache (linux)'; echo '```'; ccache --show-stats; echo '```'; } \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stage
+        run: |
+          set -euo pipefail
+          rm -rf dist && mkdir -p dist
+          cp build-linux/DK64UnKONGtrolled dist/
+          cp -r assets dist/
+          cp recompcontrollerdb.txt dist/
+
+      - name: Guard - no asset files in the artifact
+        run: |
+          set -euo pipefail
+          found=$(find dist \( -iname '*.z64' -o -iname '*.v64' -o -iname '*.n64' -o -type l \))
+          [ -z "$found" ] || { echo "::error::asset file or symlink staged for upload:"; echo "$found"; exit 1; }
+          echo "dist is clean ($(du -sh dist | cut -f1))"
+
+      # upload-artifact zips without file modes, so a bare binary would arrive
+      # without +x and the published Linux build would not run. Tar first.
+      - name: Archive
+        run: tar -czf DK64UnKONGtrolled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64.tar.gz -C dist .
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: DK64UnKONGtrolled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64
+          path: DK64UnKONGtrolled-${{ steps.short_sha.outputs.SHORT_SHA }}-linux-x64.tar.gz
+          if-no-files-found: error
+
+  # ------------------------------------------------------------ windows cross
+  windows-cross:
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && vars.SKIP_WINDOWS != 'true'
+      && !contains(github.event.head_commit.message, '[skip windows]')
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set short SHA
+        id: short_sha
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Preflight
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [ -f "$ASSET_PATH" ] || fail "No asset at $ASSET_PATH"
+          for t in clang-cl lld-link llvm-lib llvm-rc llvm-mt wine gendef cmake ninja ccache; do
+            command -v "$t" >/dev/null || fail "missing: $t"
+          done
+          splat="${XWIN_SPLAT:-}"
+          # `xwin splat` writes to ./.xwin-cache/splat, so the documented
+          # command leaves it at ~/.xwin-cache/splat. The second path is not an
+          # older xwin default -- it is only checked so a splat that already
+          # lives there keeps working.
+          [ -n "$splat" ] || for c in "$HOME/.xwin-cache/splat" "$HOME/.cache/xwin/splat"; do
+            [ -d "$c/crt/include" ] && { splat="$c"; break; }
+          done
+          [ -d "$splat/crt/include" ] || fail "no xwin splat at $splat"
+          # The headers existing does not mean the libraries do. xwin uses
+          # x86_64 by default and x64 only with --preserve-ms-arch-notation,
+          # and lld-link needs the
+          # lowercase symlinks beside the SDK's original casing. Checking only
+          # the include side turns both of these into a failure four minutes in.
+          um=""
+          for a in x64 x86_64; do
+            [ -d "$splat/sdk/lib/um/$a" ] && { um="$splat/sdk/lib/um/$a"; break; }
+          done
+          [ -n "$um" ] || fail "no x64 or x86_64 library directory under $splat/sdk/lib/um"
+          [ -e "$um/kernel32.lib" ] \
+            || fail "$um has no lowercase kernel32.lib -- re-run 'xwin splat' with symlinks enabled"
+          [ -e /usr/x86_64-w64-mingw32/sys-root/mingw/include/directx/d3d12.h ] \
+            || [ -e cross/directx-headers/directx/d3d12.h ] \
+            || [ -n "${DIRECTX_HEADERS:-}" ] \
+            || fail "no DirectX-Headers (the xwin SDK's d3d12.h is too old)"
+
+      - name: Build the recompilers
+        run: |
+          set -euo pipefail
+          cmake -S lib/N64Recomp -B build-n64recomp -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-n64recomp --target N64RecompCLI RSPRecomp -j"$(nproc)"
+          cp build-n64recomp/N64Recomp build-n64recomp/RSPRecomp .
+
+      - name: libcurl for the MSVC ABI
+        run: |
+          set -euo pipefail
+          [ -x lib/vcpkg/vcpkg ] || ( cd lib/vcpkg && ./bootstrap-vcpkg.sh -disableMetrics )
+          # --classic: the repo has a vcpkg.json, which otherwise puts vcpkg in
+          # manifest mode, where per-package arguments are rejected outright.
+          ./lib/vcpkg/vcpkg install --classic curl:x64-mingw-dynamic-release \
+            --x-install-root="$PWD/vcpkg_installed" \
+            --overlay-triplets="$PWD/lib/vcpkg/triplets/community" \
+            --clean-buildtrees-after-build
+
+      - name: Supply the asset file
+        run: ln -sfn "$ASSET_PATH" "$ASSET_FILENAME"
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          mkdir -p "$CCACHE_DIR"
+          ccache --zero-stats >/dev/null
+          WINEDEBUG=-all ./cross/build-windows.sh
+          # Printed to the log as well as the summary: the summary is not
+          # reachable from the API, so stats that only go there cannot be read
+          # back when working out why a build was slow.
+          echo "--- ccache (windows) ---"
+          ccache --show-stats -v || ccache --show-stats
+          # A cache that caches nothing is indistinguishable from one that
+          # works, except slower -- which is how ccache 4.7.5 quietly added
+          # nothing to this build while reporting success. Check the property,
+          # not the presence of the binary.
+          cacheable=$(ccache --print-stats 2>/dev/null | awk '
+            $1=="direct_cache_hit" || $1=="preprocessed_cache_hit" || $1=="cache_miss" {n+=$2}
+            END {print n+0}')
+          if [ "${cacheable:-0}" -eq 0 ]; then
+            echo "::warning::ccache handled no cacheable compilations ($(ccache --version | head -1)). 4.7.5 (Debian bookworm) cannot cache this project's clang-cl calls; 4.12.3 can. Check the version on the runner."
+          fi
+          { echo '### ccache (windows)'; echo '```'; ccache --show-stats; echo '```'; } \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guard - no asset files in the artifact
+        run: |
+          set -euo pipefail
+          found=$(find build-win/dist \( -iname '*.z64' -o -iname '*.v64' -o -iname '*.n64' -o -type l \))
+          [ -z "$found" ] || { echo "::error::asset file or symlink staged for upload:"; echo "$found"; exit 1; }
+          echo "dist is clean ($(du -sh build-win/dist | cut -f1))"
+
+      # No tar here. upload-artifact already zips what it is given, and the
+      # execute bit that makes the Linux binary need a tarball is meaningless
+      # on Windows -- taring first only produced a zip wrapping a tarball.
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: DK64UnKONGtrolled-${{ steps.short_sha.outputs.SHORT_SHA }}-windows-x64
+          path: build-win/dist/
+          if-no-files-found: error

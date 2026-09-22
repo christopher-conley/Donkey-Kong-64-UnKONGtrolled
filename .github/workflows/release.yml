@@ -1,0 +1,148 @@
+# SPDX-FileCopyrightText: 2026 Christopher Conley
+# SPDX-License-Identifier: MIT
+#
+# Publishes a release when a version tag is pushed.
+#
+# Nothing is built here. The release is made from the artifacts of the build that
+# already ran for the tagged commit -- the exact binaries that were built and tested,
+# not a rebuild of them. That is also why this runs on a GitHub-hosted runner: it never
+# needs the build inputs the self-hosted runner holds.
+#
+# Tags are bare versions, 1.0.4 rather than v1.0.4, matching the tags inherited from
+# upstream and the format recomp::Version::from_string accepts. A suffix such as
+# 1.0.4-test1 publishes as a prerelease.
+#
+# To release: bump version_string in src/main/main.cpp, push, let the build finish (or
+# don't -- this waits for it), then tag that commit and push the tag.
+name: release
+
+on:
+  push:
+    # Deliberately loose. The exact format is enforced by the version check below,
+    # where a bad tag fails loudly; a pattern that failed to match would instead mean
+    # the release silently never ran.
+    tags: [ '[0-9]*' ]
+
+permissions:
+  contents: write   # create the release
+  actions: read     # find the build run and download its artifacts
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tag must match the version in the source
+        id: version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          base="${tag%%-*}"
+          src=$(sed -n 's/.*version_string = "\([^"]*\)".*/\1/p' src/main/main.cpp)
+          echo "tag $tag   base $base   source $src"
+          # The game parses this string and exits at launch if it cannot, and mods gate on
+          # it, so a release whose tag disagrees with the binary is worse than no release.
+          [ -n "$src" ] || { echo "::error::could not find version_string in src/main/main.cpp"; exit 1; }
+          [ "$base" = "$src" ] || { echo "::error::tag $tag does not match version_string \"$src\" in src/main/main.cpp -- bump it and tag that commit"; exit 1; }
+          echo "label=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$([ "$tag" != "$base" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Find the build for this commit
+        id: build
+        run: |
+          set -euo pipefail
+          # The build is triggered by the branch push, not the tag. If both were pushed
+          # together it may still be running, so wait for it; if the commit was pushed
+          # with [skip ci], no build exists and never will.
+          deadline=$(( $(date +%s) + 75*60 ))
+          grace=$(( $(date +%s) + 5*60 ))
+          while :; do
+            runs=$(gh run list --repo "$REPO" --workflow build.yml --commit "$GITHUB_SHA" \
+                     --json databaseId,status,conclusion --limit 20)
+            ok=$(jq -r '[.[] | select(.conclusion == "success")] | sort_by(.databaseId) | last | .databaseId // empty' <<<"$runs")
+            if [ -n "$ok" ]; then echo "run=$ok" >> "$GITHUB_OUTPUT"; echo "using build run $ok"; break; fi
+            total=$(jq 'length' <<<"$runs")
+            pending=$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")
+            now=$(date +%s)
+            if [ "$total" -eq 0 ] && [ "$now" -ge "$grace" ]; then
+              echo "::error::no build exists for $GITHUB_SHA -- was it pushed with [skip ci], or never pushed to a branch?"; exit 1
+            fi
+            if [ "$total" -gt 0 ] && [ "$pending" -eq 0 ]; then
+              echo "::error::every build for $GITHUB_SHA finished without succeeding"; exit 1
+            fi
+            [ "$now" -lt "$deadline" ] || { echo "::error::timed out waiting for the build of $GITHUB_SHA"; exit 1; }
+            echo "waiting for the build of $GITHUB_SHA ($total found, $pending still running)"
+            sleep 30
+          done
+
+      - name: Both targets must be present
+        run: |
+          set -euo pipefail
+          # A build pushed with [skip linux] or [skip windows] succeeds with one artifact.
+          # Publishing that would ship half a release, so refuse.
+          names=$(gh api "repos/$REPO/actions/runs/${{ steps.build.outputs.run }}/artifacts" \
+                    --jq '.artifacts[] | select(.expired == false) | .name')
+          echo "$names"
+          for t in linux-x64 windows-x64; do
+            grep -q -- "-$t\$" <<<"$names" || { echo "::error::build run ${{ steps.build.outputs.run }} has no unexpired $t artifact"; exit 1; }
+          done
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.build.outputs.run }}
+          github-token: ${{ github.token }}
+          path: artifacts
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          label="${{ steps.version.outputs.label }}"
+          # Linux arrives as a tarball, which is what preserves its execute bit; Windows
+          # arrives as loose files. Name both by version rather than by commit.
+          lin=$(find artifacts -name '*-linux-x64.tar.gz' | head -1)
+          [ -n "$lin" ] || { echo "::error::no Linux tarball in the downloaded artifacts"; exit 1; }
+          cp "$lin" "DK64UnKONGtrolled-$label-linux-x64.tar.gz"
+          win=$(find artifacts -maxdepth 1 -type d -name '*-windows-x64' | head -1)
+          [ -n "$win" ] || { echo "::error::no Windows artifact directory"; exit 1; }
+          ( cd "$win" && zip -qr "$GITHUB_WORKSPACE/DK64UnKONGtrolled-$label-windows-x64.zip" . )
+          # Checksums in binary mode ("hash *file"), the explicit form a Windows sha256sum
+          # also expects. One .sha256 per archive so each download has its checksum beside
+          # it, plus the combined SHA256SUMS. Verify with: sha256sum -c <file>.sha256
+          for f in DK64UnKONGtrolled-*.tar.gz DK64UnKONGtrolled-*.zip; do
+            sha256sum -b "$f" > "$f.sha256"
+          done
+          sha256sum -b DK64UnKONGtrolled-*.tar.gz DK64UnKONGtrolled-*.zip > SHA256SUMS
+          cat SHA256SUMS
+          sha256sum -c ./*.sha256   # prove each file verifies before it is published
+
+      - name: Notes
+        run: |
+          set -euo pipefail
+          {
+            echo "Built from \`${GITHUB_SHA}\` in [build run ${{ steps.build.outputs.run }}](https://github.com/$REPO/actions/runs/${{ steps.build.outputs.run }})."
+            echo
+            echo "| submodule | revision |"
+            echo "|---|---|"
+            # The pinned revisions are in the index, so this needs no submodule checkout.
+            git submodule status | awk '{gsub(/^[ +-]/,"",$1); print "| `" $2 "` | `" substr($1,1,12) "` |"}'
+          } > notes.md
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DK64 UnKONGtrolled ${{ steps.version.outputs.label }}
+          body_path: notes.md
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          fail_on_unmatched_files: true
+          files: |
+            DK64UnKONGtrolled-*.tar.gz
+            DK64UnKONGtrolled-*.zip
+            DK64UnKONGtrolled-*.sha256
+            SHA256SUMS

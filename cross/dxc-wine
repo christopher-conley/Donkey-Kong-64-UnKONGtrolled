@@ -1,0 +1,41 @@
+#!/bin/bash
+# SPDX-FileCopyrightText: 2026 Christopher Conley
+# SPDX-License-Identifier: MIT
+# Run the Windows dxc.exe under wine when cross-compiling to Windows from Linux.
+#
+# Why this exists: wine resolves a Unix path given as the positional source file, but
+# NOT one given to -I. dxc then compiles the top-level .hlsl and fails on its first
+# #include. So translate Unix paths in the arguments to Windows form before handing
+# them over.
+#
+# Z: is mapped to / in every default wine prefix, so the translation is a literal one;
+# doing it in-process avoids ~200 winepath invocations per build.
+#
+# Usage: dxc-wine /path/to/dxc.exe <dxc args...>
+set -euo pipefail
+
+DXC_EXE="$1"; shift
+
+towin() { printf 'Z:%s' "${1//\//\\}"; }
+
+args=()
+for a in "$@"; do
+    case "$a" in
+        -I/*)
+            args+=( "-I$(towin "${a#-I}")" ) ;;
+        /*/*)
+            # An absolute path with a directory component: translate it if it exists, or
+            # if its parent does (an output file that has not been written yet).
+            # dxc's own Windows-style flags (/Fo, /Fh, /nologo) have no second slash and
+            # fall through to the default case untouched.
+            if [ -e "$a" ] || [ -d "$(dirname "$a")" ]; then
+                args+=( "$(towin "$a")" )
+            else
+                args+=( "$a" )
+            fi ;;
+        *)
+            args+=( "$a" ) ;;
+    esac
+done
+
+exec wine "$DXC_EXE" "${args[@]}"

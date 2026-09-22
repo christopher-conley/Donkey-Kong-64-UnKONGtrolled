@@ -8,8 +8,16 @@
 #include "json/json.hpp"
 
 namespace dk64 {
-    inline const std::u8string program_id = u8"DK64Recompiled";
-    inline const std::string program_name = "DK64: Rekongpiled";
+    inline const std::u8string program_id = u8"DK64UnKONGtrolled";
+    inline const std::string program_name = "DK64: UnKONGtrolled";
+
+    // The id this program used before the fork renamed it. Its directory is
+    // imported once, on first launch under the new name, by
+    // dk64::migrate_legacy_config(). Anything that needs to convert the
+    // contents as well as move them belongs in that function.
+    inline const std::u8string legacy_program_id = u8"DK64Recompiled";
+
+    void migrate_legacy_config();
 
     namespace configkeys {
         namespace general {

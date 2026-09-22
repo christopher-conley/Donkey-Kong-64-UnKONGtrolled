@@ -1,5 +1,5 @@
 {
-  "id": "io.github.dk64recompiled.dk64recompiled",
+  "id": "io.github.dk64unkongtrolled.dk64unkongtrolled",
   "runtime": "org.freedesktop.Platform",
   "runtime-version": "25.08",
   "sdk": "org.freedesktop.Sdk",
@@ -17,7 +17,7 @@
   ],
   "modules": [
     {
-      "name": "DK64Recompiled",
+      "name": "dk64unkongtrolled",
       "buildsystem": "simple",
       "build-commands": [
         "cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DCMAKE_MAKE_PROGRAM=ninja -G Ninja -S lib/N64Recomp -B lib/N64Recomp/cmake-build",
@@ -28,21 +28,21 @@
         "./N64Recomp us.toml",
         "./RSPRecomp n_aspMain.toml",
         "cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DCMAKE_MAKE_PROGRAM=ninja -DPATCHES_C_COMPILER=clang -DPATCHES_LD=ld.lld -DRECOMP_FLATPAK=ON -G Ninja -S . -B cmake-build",
-        "cmake --build cmake-build --config Release --target DK64Recompiled --parallel",
+        "cmake --build cmake-build --config Release --target DK64UnKONGtrolled --parallel",
         "rm -rf assets/scss",
         "mkdir -p /app/bin",
-        "cp cmake-build/DK64Recompiled /app/bin/DK64Recompiled",
+        "cp cmake-build/DK64UnKONGtrolled /app/bin/DK64UnKONGtrolled",
         "cp recompcontrollerdb.txt /app/bin/recompcontrollerdb.txt",
         "cp -R assets /app/bin/assets",
         "install -Dm644 icons/app.png /app/share/icons/hicolor/512x512/apps/${FLATPAK_ID}.png",
-        "install -Dm644 flatpak/io.github.dk64recompiled.dk64recompiled.metainfo.xml /app/share/metainfo/${FLATPAK_ID}.metainfo.xml",
-        "install -Dm644 flatpak/io.github.dk64recompiled.dk64recompiled.desktop /app/share/applications/${FLATPAK_ID}.desktop"
+        "install -Dm644 flatpak/io.github.dk64unkongtrolled.dk64unkongtrolled.metainfo.xml /app/share/metainfo/${FLATPAK_ID}.metainfo.xml",
+        "install -Dm644 flatpak/io.github.dk64unkongtrolled.dk64unkongtrolled.desktop /app/share/applications/${FLATPAK_ID}.desktop"
       ],
       "sources": [
         {
           "type": "git",
-          "url": "https://github.com/N64Recomp/N64Recomp.git",
-          "commit": "2b6f05688de2abc7d86da5b4a89b84c2c6acbabe",
+          "url": "https://github.com/christopher-conley/N64Recomp.git",
+          "commit": "03bf12dd8d9af45fa4386acdb764f518317c70bd",
           "dest": "lib/N64Recomp"
         },
         {
