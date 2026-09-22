@@ -5,7 +5,7 @@ set(ENTITLEMENTS_FILE ${CMAKE_SOURCE_DIR}/.github/macos/entitlements.plist)
 set_target_properties(DK64UnKONGtrolled PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "DK64UnKONGtrolled"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "com.github.dk64recompiled"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.github.dk64unkongtrolled"
         MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
         MACOSX_BUNDLE_ICON_FILE "AppIcon.icns"
