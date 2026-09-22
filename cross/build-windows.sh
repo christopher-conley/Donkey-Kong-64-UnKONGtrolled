@@ -79,7 +79,7 @@ cmake -S "$REPO" -B "$BUILD" -G Ninja \
     -DPATCHES_C_COMPILER=clang -DPATCHES_LD=ld.lld
 
 echo "==> build"
-WINEDEBUG="${WINEDEBUG:--all}" cmake --build "$BUILD" --target DK64Recompiled -j"$(nproc)"
+WINEDEBUG="${WINEDEBUG:--all}" cmake --build "$BUILD" --target DK64UnKONGtrolled -j"$(nproc)"
 
 echo "==> staging runtime files"
 DIST="$BUILD/dist"

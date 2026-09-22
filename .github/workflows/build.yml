@@ -125,7 +125,7 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_FLAGS="-include cstdint" \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-multiple-definition"
-          cmake --build build-linux --target DK64Recompiled -j"$(nproc)"
+          cmake --build build-linux --target DK64UnKONGtrolled -j"$(nproc)"
           # Printed so a cache that has silently stopped working is visible
           # rather than showing up only as a build that got slow again.
           # Printed to the log as well as the summary: the summary is not

@@ -5,11 +5,11 @@ make -C patches CC=clang LD=ld.lld
 
 Build
 ```sh
-flatpak-builder --force-clean --user --install-deps-from=flathub --repo=repo --install builddir io.github.dk64recompiled.dk64recompiled.json
+flatpak-builder --force-clean --user --install-deps-from=flathub --repo=repo --install builddir io.github.dk64unkongtrolled.dk64unkongtrolled.json
 ```
 
 Bundle
 ```sh
-flatpak build-bundle repo io.github.dk64recompiled.dk64recompiled.flatpak io.github.dk64recompiled.dk64recompiled --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
+flatpak build-bundle repo io.github.dk64unkongtrolled.dk64unkongtrolled.flatpak io.github.dk64unkongtrolled.dk64unkongtrolled --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
 ```
 
