@@ -794,7 +794,7 @@ int main(int argc, char** argv) {
     REGISTER_FUNC(recomp_get_draw_distance);
     REGISTER_FUNC(recomp_get_story_skip);
     REGISTER_FUNC(recomp_get_camera_type);
-    REGISTER_FUNC(recomp_get_lightning_intensity);
+    REGISTER_FUNC(recomp_get_lightning_frequency);
     REGISTER_FUNC(recomp_get_cutscene_bordering);
     REGISTER_FUNC(recomp_get_mp_enabled);
     REGISTER_FUNC(recomp_get_ui_bounds);

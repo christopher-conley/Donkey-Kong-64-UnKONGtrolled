@@ -147,16 +147,16 @@ extern "C" void recomp_get_camera_type(uint8_t* rdram, recomp_context* ctx) {
     }
 }
 
-extern "C" void recomp_get_lightning_intensity(uint8_t* rdram, recomp_context* ctx) {
+extern "C" void recomp_get_lightning_frequency(uint8_t* rdram, recomp_context* ctx) {
     switch (dk64::get_lightning_flash()) {
         case dk64::LightningFlashMode::Off:
             _return(ctx, 0);
             return;
         case dk64::LightningFlashMode::Reduced:
-            _return(ctx, 0.6f);
+            _return(ctx, 10);
             return;
         case dk64::LightningFlashMode::Vanilla:
-            _return(ctx, 1.0f);
+            _return(ctx, 1);
             return;
     }
 }

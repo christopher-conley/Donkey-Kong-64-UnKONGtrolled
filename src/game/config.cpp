@@ -124,8 +124,8 @@ static void add_general_options(recomp::config::Config &config) {
     };
     config.add_enum_option(
         dk64::configkeys::general::lightning_flashes,
-        "Lightning Flash Intensity",
-        "Changes the intensity of lightning flashes within the game.<br /><recomp-color primary>Vanilla</recomp-color>: Lightning flashes at 100% intensity<br /><recomp-color primary>Reduced</recomp-color>: Lightning flashes at 60% intensity<br /><recomp-color primary>Off</recomp-color>: Lightning flashes are completely disabled",
+        "Lightning Flash Frequency",
+        "Changes the frequency of lightning flashes within the game.<br /><recomp-color primary>Vanilla</recomp-color>: Lightning flashes at vanilla frequency<br /><recomp-color primary>Reduced</recomp-color>: Lightning flashes at 10x as less<br /><recomp-color primary>Off</recomp-color>: Lightning flashes are completely disabled",
         lightning_flash_options,
         dk64::LightningFlashMode::Reduced
     );
