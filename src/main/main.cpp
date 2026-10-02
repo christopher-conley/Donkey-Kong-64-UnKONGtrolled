@@ -43,6 +43,7 @@
 #include "donk_support.h"
 #include "donk_game.h"
 #include "donk_launcher.h"
+#include "audio_device_recovery.h"
 #include "recomp_data.h"
 #include "ovl_patches.hpp"
 #include "theme.h"
@@ -280,7 +281,44 @@ static uint32_t discarded_output_frames;
 
 constexpr uint32_t bytes_per_frame = input_channels * sizeof(float);
 
+static SDL_AudioDeviceID open_audio_device(uint32_t output_freq) {
+    SDL_AudioSpec spec_desired{
+        .freq = (int)output_freq,
+        .format = AUDIO_F32,
+        .channels = (Uint8)output_channels,
+        .silence = 0, // calculated
+        .samples = 0x100, // Fairly small sample count to reduce the latency of internal buffering
+        .padding = 0, // unused
+        .size = 0, // calculated
+        .callback = nullptr,
+        .userdata = nullptr
+    };
+
+    return SDL_OpenAudioDevice(nullptr, false, &spec_desired, nullptr, 0);
+}
+
+// Opens a replacement for a lost device in the same format, so the converter built for it still applies.
+static SDL_AudioDeviceID reopen_audio_device() {
+    return open_audio_device(output_sample_rate);
+}
+
+static dk64::AudioDeviceRecovery audio_device_recovery;
+
+// Reopens the audio device if SDL has lost it or it has stopped consuming audio.
+static bool ensure_audio_device() {
+    // 300 ms of queued output. queue_samples skips incoming samples once 100 ms are queued, and more
+    // aggressively for every further 100 ms, so a device that is playing never holds this much for long.
+    // Raising that skip threshold means raising this one too.
+    const Uint32 stall_bytes = output_sample_rate * output_channels * sizeof(float) * 3 / 10;
+    return dk64::keep_audio_device_playing(audio_device, reopen_audio_device, audio_device_recovery, stall_bytes);
+}
+
 void queue_samples(int16_t* audio_data, size_t sample_count) {
+    // Audio produced while no device is available is dropped rather than queued.
+    if (!ensure_audio_device()) {
+        return;
+    }
+
     // Buffer for holding the output of swapping the audio channels. This is reused across
     // calls to reduce runtime allocations.
     static std::vector<float> swap_buffer;
@@ -347,6 +385,11 @@ void queue_samples(int16_t* audio_data, size_t sample_count) {
 
 size_t get_frames_remaining() {
     constexpr float buffer_offset_frames = 1.0f;
+    // Checked here as well as in queue_samples: a stalled device's queue never drains, and a game that
+    // sizes its next buffer from osAiGetLength may stop queueing samples altogether.
+    if (!ensure_audio_device()) {
+        return 0;
+    }
     // Get the number of remaining buffered audio bytes.
     uint64_t buffered_byte_count = SDL_GetQueuedAudioSize(audio_device);
 
@@ -387,19 +430,7 @@ void set_frequency(uint32_t freq) {
 }
 
 bool reset_audio(uint32_t output_freq) {
-    SDL_AudioSpec spec_desired{
-        .freq = (int)output_freq,
-        .format = AUDIO_F32,
-        .channels = (Uint8)output_channels,
-        .silence = 0, // calculated
-        .samples = 0x100, // Fairly small sample count to reduce the latency of internal buffering
-        .padding = 0, // unused
-        .size = 0, // calculated
-        .callback = nullptr,
-        .userdata = nullptr
-    };
-
-    audio_device = SDL_OpenAudioDevice(nullptr, false, &spec_desired, nullptr, 0);
+    audio_device = open_audio_device(output_freq);
     if (audio_device == 0) {
         std::string audio_error = std::string("No audio device could be found. Please make sure an audio device is available.\nError opening audio device: ") + std::string(SDL_GetError());
         recompui::message_box(audio_error.c_str());

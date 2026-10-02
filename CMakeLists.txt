@@ -152,6 +152,7 @@ add_custom_command(OUTPUT
 add_executable(DK64UnKONGtrolled)
 
 set (SOURCES
+    ${CMAKE_SOURCE_DIR}/src/main/audio_device_recovery.cpp
     ${CMAKE_SOURCE_DIR}/src/main/launcher_animation.cpp
     ${CMAKE_SOURCE_DIR}/src/main/main.cpp
     ${CMAKE_SOURCE_DIR}/src/main/register_overlays.cpp
